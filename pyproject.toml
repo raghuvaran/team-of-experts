@@ -1,0 +1,80 @@
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "team-of-experts"
+version = "0.1.0"
+description = "TXP CLI - Parallel test-time compute using multiple LLM reasoning agents with AWS Bedrock"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Team of Experts Contributors"}
+]
+keywords = ["aws", "bedrock", "claude", "ai", "reasoning", "parallel-compute", "llm", "cli"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Environment :: Console",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "boto3>=1.35.0",
+    "pydantic>=2.0.0",
+    "rich>=13.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.24.0",
+    "hypothesis>=6.100.0",
+    "black>=24.0.0",
+    "mypy>=1.11.0",
+    "ruff>=0.4.0",
+]
+
+[project.scripts]
+txp = "txp.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/team-of-experts/txp-cli"
+Documentation = "https://github.com/team-of-experts/txp-cli#readme"
+Repository = "https://github.com/team-of-experts/txp-cli"
+Issues = "https://github.com/team-of-experts/txp-cli/issues"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["txp*"]
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312", "py313"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
