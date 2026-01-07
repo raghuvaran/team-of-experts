@@ -1,7 +1,7 @@
-"""Configuration management for TXP CLI.
+"""Configuration management for TOXP CLI.
 
-Handles persistent configuration at ~/.txp/config.json with support for:
-- Environment variable overrides (TXP_AWS_PROFILE)
+Handles persistent configuration at ~/.toxp/config.json with support for:
+- Environment variable overrides (TOXP_AWS_PROFILE)
 - CLI argument overrides
 - Configuration precedence: CLI > ENV > file > defaults
 """
@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 
 # Configuration directory and file paths
-CONFIG_DIR = Path.home() / ".txp"
+CONFIG_DIR = Path.home() / ".toxp"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 # Valid configuration keys
@@ -44,10 +44,10 @@ CLI_KEY_MAP = {
 }
 
 # Environment variable prefix
-ENV_PREFIX = "TXP_"
+ENV_PREFIX = "TOXP_"
 
 
-class TxpConfig(BaseModel):
+class ToxpConfig(BaseModel):
     """User configuration with defaults.
     
     All configuration values have sensible defaults and can be overridden
@@ -134,17 +134,17 @@ class TxpConfig(BaseModel):
         return self.model_dump_json(indent=2)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "TxpConfig":
+    def from_dict(cls, data: Dict[str, Any]) -> "ToxpConfig":
         """Create from dictionary."""
         return cls.model_validate(data)
 
     @classmethod
-    def from_json(cls, json_str: str) -> "TxpConfig":
+    def from_json(cls, json_str: str) -> "ToxpConfig":
         """Create from JSON string."""
         return cls.model_validate_json(json_str)
 
     @classmethod
-    def get_defaults(cls) -> "TxpConfig":
+    def get_defaults(cls) -> "ToxpConfig":
         """Get default configuration."""
         return cls()
 
@@ -160,7 +160,7 @@ def _denormalize_key(key: str) -> str:
 
 
 class ConfigManager:
-    """Manages persistent configuration at ~/.txp/config.json.
+    """Manages persistent configuration at ~/.toxp/config.json.
     
     Supports configuration precedence: CLI args > environment variables > config file > defaults.
     """
@@ -198,16 +198,16 @@ class ConfigManager:
     def _get_env_overrides(self) -> Dict[str, Any]:
         """Get configuration overrides from environment variables.
         
-        Supports TXP_AWS_PROFILE and other TXP_* environment variables.
+        Supports TOXP_AWS_PROFILE and other TOXP_* environment variables.
         """
         overrides: Dict[str, Any] = {}
         
-        # Check for TXP_AWS_PROFILE specifically (as per requirements)
-        aws_profile = os.environ.get("TXP_AWS_PROFILE")
+        # Check for TOXP_AWS_PROFILE specifically (as per requirements)
+        aws_profile = os.environ.get("TOXP_AWS_PROFILE")
         if aws_profile is not None:
             overrides["aws_profile"] = aws_profile
         
-        # Check for other TXP_* environment variables
+        # Check for other TOXP_* environment variables
         for key in VALID_CONFIG_KEYS:
             env_key = f"{ENV_PREFIX}{key.upper()}"
             env_value = os.environ.get(env_key)
@@ -218,8 +218,8 @@ class ConfigManager:
 
     def _parse_env_value(self, key: str, value: str) -> Any:
         """Parse environment variable value to appropriate type."""
-        # Get the field type from TxpConfig
-        defaults = TxpConfig.get_defaults()
+        # Get the field type from ToxpConfig
+        defaults = ToxpConfig.get_defaults()
         default_value = getattr(defaults, key)
         
         if isinstance(default_value, bool):
@@ -230,13 +230,13 @@ class ConfigManager:
             return float(value)
         return value
 
-    def load(self) -> TxpConfig:
+    def load(self) -> ToxpConfig:
         """Load configuration with precedence: ENV > file > defaults.
         
         Note: CLI args are applied separately via apply_overrides().
         """
         # Start with defaults
-        config_data = TxpConfig.get_defaults().to_dict()
+        config_data = ToxpConfig.get_defaults().to_dict()
         
         # Apply file values
         file_data = self._load_from_file()
@@ -253,9 +253,9 @@ class ConfigManager:
         if not self._config_file.exists():
             self._save_to_file(config_data)
         
-        return TxpConfig.from_dict(config_data)
+        return ToxpConfig.from_dict(config_data)
 
-    def save(self, config: TxpConfig) -> None:
+    def save(self, config: ToxpConfig) -> None:
         """Save configuration to file."""
         self._save_to_file(config.to_dict())
 
@@ -296,7 +296,7 @@ class ConfigManager:
         # Load current config from file only (not env vars) to preserve user settings
         file_data = self._load_from_file()
         if not file_data:
-            file_data = TxpConfig.get_defaults().to_dict()
+            file_data = ToxpConfig.get_defaults().to_dict()
         
         # Convert value to appropriate type
         converted_value = self._convert_value(normalized_key, value)
@@ -304,7 +304,7 @@ class ConfigManager:
         # Validate by creating a test config
         test_data = file_data.copy()
         test_data[normalized_key] = converted_value
-        TxpConfig.from_dict(test_data)  # This will raise if invalid
+        ToxpConfig.from_dict(test_data)  # This will raise if invalid
         
         # Save to file
         file_data[normalized_key] = converted_value
@@ -321,7 +321,7 @@ class ConfigManager:
             return None
         
         if isinstance(value, str):
-            defaults = TxpConfig.get_defaults()
+            defaults = ToxpConfig.get_defaults()
             default_value = getattr(defaults, key)
             
             if isinstance(default_value, bool):
@@ -334,7 +334,7 @@ class ConfigManager:
 
     def reset(self) -> None:
         """Reset configuration to defaults."""
-        defaults = TxpConfig.get_defaults()
+        defaults = ToxpConfig.get_defaults()
         self._save_to_file(defaults.to_dict())
 
     def show(self) -> Dict[str, Any]:
@@ -346,7 +346,7 @@ class ConfigManager:
         config = self.load()
         return config.to_dict()
 
-    def apply_overrides(self, config: TxpConfig, cli_args: Dict[str, Any]) -> TxpConfig:
+    def apply_overrides(self, config: ToxpConfig, cli_args: Dict[str, Any]) -> ToxpConfig:
         """Apply CLI argument overrides to configuration.
         
         This implements the highest precedence level (CLI > ENV > file > defaults).
@@ -356,7 +356,7 @@ class ConfigManager:
             cli_args: CLI argument overrides (may use kebab-case keys)
             
         Returns:
-            New TxpConfig with CLI overrides applied
+            New ToxpConfig with CLI overrides applied
         """
         config_data = config.to_dict()
         
@@ -366,7 +366,7 @@ class ConfigManager:
                 if normalized_key in VALID_CONFIG_KEYS:
                     config_data[normalized_key] = value
         
-        return TxpConfig.from_dict(config_data)
+        return ToxpConfig.from_dict(config_data)
 
     def get_valid_keys(self) -> List[str]:
         """Get list of valid configuration keys in CLI format (kebab-case)."""

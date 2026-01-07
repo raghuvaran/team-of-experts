@@ -1,4 +1,4 @@
-"""Pluggable LLM provider architecture for TXP CLI.
+"""Pluggable LLM provider architecture for TOXP CLI.
 
 This module provides an extensible provider system that allows connecting
 to different LLM backends (Bedrock, Anthropic API, OpenAI, etc.) without

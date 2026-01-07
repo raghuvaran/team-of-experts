@@ -1,9 +1,9 @@
 """Orchestrator for parallel agent execution and synthesis.
 
-This module implements the main orchestration logic for TXP, coordinating
+This module implements the main orchestration logic for TOXP, coordinating
 parallel reasoning agent execution and coordinator synthesis.
 
-Feature: txp-cli
+Feature: toxp-cli
 Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 7.5
 """
 
@@ -12,14 +12,14 @@ import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
 
-from txp.agents.coordinator import CoordinatorAgent
-from txp.agents.reasoning import ReasoningAgent
-from txp.exceptions import InsufficientAgentsError
-from txp.models.query import Query
-from txp.models.response import AgentResponse, CoordinatorResponse
-from txp.models.result import Result
-from txp.providers.base import BaseProvider
-from txp.utils.rate_limiter import AdaptiveRateLimiter
+from toxp.agents.coordinator import CoordinatorAgent
+from toxp.agents.reasoning import ReasoningAgent
+from toxp.exceptions import InsufficientAgentsError
+from toxp.models.query import Query
+from toxp.models.response import AgentResponse, CoordinatorResponse
+from toxp.models.result import Result
+from toxp.providers.base import BaseProvider
+from toxp.utils.rate_limiter import AdaptiveRateLimiter
 
 
 logger = logging.getLogger(__name__)
@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 class Orchestrator:
     """Coordinates parallel agent execution and synthesis.
     
-    The Orchestrator is the main entry point for processing queries through TXP.
+    The Orchestrator is the main entry point for processing queries through TOXP.
     It:
     1. Spawns N reasoning agents concurrently with rate limiting
     2. Validates that enough agents succeeded (≥50%)
@@ -107,7 +107,7 @@ class Orchestrator:
         on_agent_complete: Optional[Callable[[int, bool, Optional[str]], None]] = None,
         on_agents_done: Optional[Callable[[], None]] = None,
     ) -> Result:
-        """Process a query through the full TXP pipeline.
+        """Process a query through the full TOXP pipeline.
         
         This is the main entry point for query processing. It:
         1. Spawns N reasoning agents concurrently

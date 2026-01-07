@@ -5,9 +5,9 @@ import re
 import time
 from typing import Optional, Tuple
 
-from txp.models.response import AgentResponse
-from txp.providers.base import BaseProvider
-from txp.agents.prompts import REASONING_AGENT_SYSTEM_PROMPT
+from toxp.models.response import AgentResponse
+from toxp.providers.base import BaseProvider
+from toxp.agents.prompts import REASONING_AGENT_SYSTEM_PROMPT
 
 
 logger = logging.getLogger(__name__)

@@ -1,6 +1,6 @@
-"""TXP utility modules.
+"""TOXP utility modules.
 
-This package contains utility classes and functions for the TXP CLI tool.
+This package contains utility classes and functions for the TOXP CLI tool.
 """
 
 from .rate_limiter import (

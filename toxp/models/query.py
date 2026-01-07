@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class Query(BaseModel):
-    """Represents a user query to be processed by the TXP system."""
+    """Represents a user query to be processed by the TOXP system."""
 
     text: str = Field(..., description="The query text to process")
     query_id: str = Field(

@@ -10,7 +10,7 @@ multiple independent expert outputs are critiqued, compared, and synthesized.
 
 from typing import List
 
-from txp.models.response import AgentResponse
+from toxp.models.response import AgentResponse
 
 
 # Reasoning agent prompt adapted from advanced reasoning methodologies

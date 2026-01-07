@@ -1,4 +1,4 @@
-"""Session logging module for TXP."""
+"""Session logging module for TOXP."""
 
 from .session_logger import SessionLogger
 

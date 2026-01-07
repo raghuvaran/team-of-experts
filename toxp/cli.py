@@ -1,6 +1,6 @@
-"""TXP CLI - Command-line interface for the Team of eXPerts system.
+"""TOXP CLI - Command-line interface for the Team of eXPerts system.
 
-Feature: txp-cli
+Feature: toxp-cli
 Requirements: 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.2, 3.3, 3.4, 3.5, 9.3, 9.8, 9.9
 """
 
@@ -10,10 +10,10 @@ import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 
-from txp import __version__
-from txp.config import ConfigManager, _denormalize_key
-from txp.exceptions import (
-    TxpError,
+from toxp import __version__
+from toxp.config import ConfigManager, _denormalize_key
+from toxp.exceptions import (
+    ToxpError,
     ConfigurationError,
     CredentialsError,
     ProviderError,
@@ -21,14 +21,14 @@ from txp.exceptions import (
     ThrottlingError,
     InsufficientAgentsError,
     NetworkError,
-    TimeoutError as TxpTimeoutError,
+    TimeoutError as ToxpTimeoutError,
 )
-from txp.logging.session_logger import SessionLogger
-from txp.models.query import Query
-from txp.orchestrator import Orchestrator
-from txp.output.formatter import OutputFormatter
-from txp.output.progress import create_progress_display
-from txp.providers.registry import ProviderRegistry
+from toxp.logging.session_logger import SessionLogger
+from toxp.models.query import Query
+from toxp.orchestrator import Orchestrator
+from toxp.output.formatter import OutputFormatter
+from toxp.output.progress import create_progress_display
+from toxp.providers.registry import ProviderRegistry
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -37,28 +37,28 @@ def create_parser() -> argparse.ArgumentParser:
     Requirements: 10.5 - Provides --help documentation for all commands and options.
     """
     parser = argparse.ArgumentParser(
-        prog="txp",
+        prog="toxp",
         description="""
-TXP - Team of eXPerts parallel reasoning system
+TOXP - Team Of eXPerts parallel reasoning system
 
-TXP spawns multiple independent reasoning agents to tackle complex queries,
+TOXP spawns multiple independent reasoning agents to tackle complex queries,
 then synthesizes their outputs through a coordinator agent into a coherent,
 high-confidence answer.
         """.strip(),
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  txp "What is the capital of France?"     Query with positional argument
-  txp -q "Explain quantum computing"       Query with --query flag
-  echo "Hello" | txp                        Query from stdin
-  txp config show                           Show all configuration
-  txp config set num-agents 8               Set configuration value
-  txp config get model                      Get a specific config value
-  txp config reset                          Reset to default configuration
+  toxp "What is the capital of France?"     Query with positional argument
+  toxp -q "Explain quantum computing"       Query with --query flag
+  echo "Hello" | toxp                        Query from stdin
+  toxp config show                           Show all configuration
+  toxp config set num-agents 8               Set configuration value
+  toxp config get model                      Get a specific config value
+  toxp config reset                          Reset to default configuration
 
 Configuration:
-  Configuration is stored at ~/.txp/config.json
-  Environment variable TXP_AWS_PROFILE overrides aws-profile config
+  Configuration is stored at ~/.toxp/config.json
+  Environment variable TOXP_AWS_PROFILE overrides aws-profile config
   CLI arguments override environment variables and config file
 
 For more information, visit: https://github.com/your-repo/team-of-experts
@@ -93,12 +93,12 @@ For more information, visit: https://github.com/your-repo/team-of-experts
     
     # Config subcommand
     config_parser = subparsers.add_parser("config", 
-                                          help="Manage TXP configuration",
-                                          description="Manage TXP configuration stored at ~/.txp/config.json")
+                                          help="Manage TOXP configuration",
+                                          description="Manage TOXP configuration stored at ~/.toxp/config.json")
     config_sub = config_parser.add_subparsers(dest="config_action", help="Config actions")
     
     set_p = config_sub.add_parser("set", help="Set a configuration value",
-                                  description="Set a configuration value in ~/.txp/config.json")
+                                  description="Set a configuration value in ~/.toxp/config.json")
     set_p.add_argument("key", help="Configuration key (e.g., num-agents, model, aws-profile)")
     set_p.add_argument("value", help="Value to set")
     
@@ -134,8 +134,8 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     
     # For query mode, create a parser without subcommands to avoid conflicts
     parser = argparse.ArgumentParser(
-        prog="txp",
-        description="TXP - Team of eXPerts parallel reasoning system",
+        prog="toxp",
+        description="TOXP - Team Of eXPerts parallel reasoning system",
     )
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("-q", "--query", dest="query_flag", help="Query text")
@@ -226,7 +226,7 @@ def handle_config_get(args: argparse.Namespace, config_manager: ConfigManager,
 def handle_config_show(config_manager: ConfigManager, formatter: OutputFormatter) -> int:
     """Handle 'config show' command. Requirements: 2.4"""
     config = config_manager.show()
-    print("TXP Configuration:")
+    print("TOXP Configuration:")
     print("-" * 40)
     for key, value in sorted(config.items()):
         display_key = _denormalize_key(key)
@@ -255,8 +255,8 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
     
     if not query_text:
         formatter.error("No query provided")
-        formatter.info("Usage: txp \"your question\" or echo \"question\" | txp")
-        formatter.info("Run 'txp --help' for more information")
+        formatter.info("Usage: toxp \"your question\" or echo \"question\" | toxp")
+        formatter.info("Run 'toxp --help' for more information")
         return 1
     
     config_manager = ConfigManager()
@@ -281,7 +281,7 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
     formatter.debug(f"Config: num_agents={config.num_agents}, model={config.model}")
     
     try:
-        from txp.providers.bedrock import BedrockProvider
+        from toxp.providers.bedrock import BedrockProvider
         
         provider_class = ProviderRegistry.get(config.provider)
         provider = provider_class(
@@ -388,7 +388,7 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
         formatter.error(e.format_for_user(verbose=verbose))
         return 1
         
-    except TxpTimeoutError as e:
+    except ToxpTimeoutError as e:
         # Requirements: 10.7 - Operation timeout
         formatter.error(e.format_for_user(verbose=verbose))
         return 1
@@ -403,8 +403,8 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
         formatter.error(e.format_for_user(verbose=verbose))
         return 1
         
-    except TxpError as e:
-        # Catch-all for any other TXP errors
+    except ToxpError as e:
+        # Catch-all for any other TOXP errors
         formatter.error(e.format_for_user(verbose=verbose))
         if verbose:
             import traceback
@@ -433,7 +433,7 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
 
 
 def main() -> int:
-    """Main entry point for the TXP CLI.
+    """Main entry point for the TOXP CLI.
     
     Requirements: 10.4, 10.5, 10.8 - Error handling and help documentation.
     """

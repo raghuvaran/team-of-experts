@@ -9,7 +9,7 @@ from .response import AgentResponse, CoordinatorResponse
 
 
 class Result(BaseModel):
-    """Represents the complete result of processing a query through TXP."""
+    """Represents the complete result of processing a query through TOXP."""
 
     query: Query = Field(..., description="The original query")
     agent_responses: List[AgentResponse] = Field(
@@ -49,7 +49,7 @@ class Result(BaseModel):
 
         output = []
         output.append("=" * 80)
-        output.append("TXP RESULT")
+        output.append("TOXP RESULT")
         output.append("=" * 80)
         output.append(f"\nQuery ID: {self.query.query_id}")
         output.append(f"Timestamp: {self.query.timestamp}")

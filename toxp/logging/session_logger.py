@@ -1,15 +1,15 @@
-"""Session logger for saving TXP sessions in markdown format."""
+"""Session logger for saving TOXP sessions in markdown format."""
 
 import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
 
-from txp.models import Result
+from toxp.models import Result
 
 
 # Default logs directory
-LOGS_DIR = Path.home() / ".txp" / "logs" / "sessions"
+LOGS_DIR = Path.home() / ".toxp" / "logs" / "sessions"
 
 # Model pricing estimates (per 1M tokens)
 # Claude Sonnet: ~$3/1M input, ~$15/1M output
@@ -37,7 +37,7 @@ class SessionLogger:
         Args:
             enabled: Whether logging is enabled
             retention_days: Number of days to retain logs
-            logs_dir: Custom logs directory (defaults to ~/.txp/logs/sessions/)
+            logs_dir: Custom logs directory (defaults to ~/.toxp/logs/sessions/)
         """
         self.enabled = enabled
         self.retention_days = retention_days
@@ -90,7 +90,7 @@ class SessionLogger:
         # Build agent summary table
         agent_table = self._format_agent_table(result.agent_responses)
 
-        return f"""# TXP Session Log
+        return f"""# TOXP Session Log
 
 **Query ID:** {result.query.query_id}
 **Timestamp:** {result.query.timestamp.isoformat()}

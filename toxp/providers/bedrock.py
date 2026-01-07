@@ -14,12 +14,12 @@ import boto3
 from botocore.config import Config as BotoConfig
 from botocore.exceptions import ClientError, NoCredentialsError, PartialCredentialsError
 
-from txp.exceptions import (
+from toxp.exceptions import (
     CredentialsError,
     ModelNotFoundError,
     ProviderError,
     ThrottlingError,
-    TimeoutError as TxpTimeoutError,
+    TimeoutError as ToxpTimeoutError,
 )
 from .base import BaseProvider, ProviderResponse
 
@@ -248,9 +248,16 @@ class BedrockProvider(BaseProvider):
                         details=error_message,
                     )
                 
+                if error_code == "ExpiredTokenException":
+                    raise CredentialsError(
+                        "AWS credentials have expired.",
+                        details=error_message,
+                    )
+                
                 if error_code == "AccessDeniedException":
                     raise CredentialsError(
-                        f"Access denied to AWS Bedrock for model {self._model_id} in region {self.region}.",
+                        f"Access denied to model {self._model_id} in {self.region}. "
+                        "Ensure you have Bedrock model access enabled in AWS console.",
                         details=error_message,
                     )
                 
@@ -274,7 +281,7 @@ class BedrockProvider(BaseProvider):
                 )
 
             except asyncio.TimeoutError:
-                raise TxpTimeoutError(
+                raise ToxpTimeoutError(
                     f"Bedrock invocation exceeded timeout",
                     timeout_seconds=self.timeout_seconds,
                 )
@@ -350,9 +357,16 @@ class BedrockProvider(BaseProvider):
                     details=error_message,
                 )
             
+            if error_code == "ExpiredTokenException":
+                raise CredentialsError(
+                    "AWS credentials have expired.",
+                    details=error_message,
+                )
+            
             if error_code == "AccessDeniedException":
                 raise CredentialsError(
-                    "Access denied to AWS Bedrock.",
+                    f"Access denied to model {self._model_id} in {self.region}. "
+                    "Ensure you have Bedrock model access enabled in AWS console.",
                     details=error_message,
                 )
             

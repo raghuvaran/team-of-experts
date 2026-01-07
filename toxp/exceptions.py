@@ -1,17 +1,17 @@
-"""Custom exceptions for TXP CLI.
+"""Custom exceptions for TOXP CLI.
 
-This module defines a hierarchy of exceptions for the TXP CLI tool,
+This module defines a hierarchy of exceptions for the TOXP CLI tool,
 providing user-friendly error messages and formatting.
 
-Feature: txp-cli
+Feature: toxp-cli
 Requirements: 10.1, 10.2, 10.3, 10.4, 10.6, 10.7
 """
 
 from typing import List, Optional
 
 
-class TxpError(Exception):
-    """Base exception for all TXP errors.
+class ToxpError(Exception):
+    """Base exception for all TOXP errors.
     
     Provides a consistent interface for user-friendly error formatting
     and optional suggestions for resolution.
@@ -28,7 +28,7 @@ class TxpError(Exception):
         suggestion: Optional[str] = None,
         details: Optional[str] = None,
     ):
-        """Initialize TxpError.
+        """Initialize ToxpError.
         
         Args:
             message: The main error message
@@ -60,7 +60,7 @@ class TxpError(Exception):
         return "".join(parts)
 
 
-class ConfigurationError(TxpError):
+class ConfigurationError(ToxpError):
     """Raised when there is a configuration error.
     
     This includes invalid configuration values, missing required
@@ -92,8 +92,8 @@ class ConfigurationError(TxpError):
         super().__init__(message, suggestion=suggestion)
 
 
-class CredentialsError(TxpError):
-    """Raised when AWS credentials are missing or invalid.
+class CredentialsError(ToxpError):
+    """Raised when AWS credentials are missing, invalid, or expired.
     
     Requirements: 10.1
     """
@@ -105,17 +105,27 @@ class CredentialsError(TxpError):
             message: The error message
             details: Optional additional details about the error
         """
-        suggestion = (
-            "Configure AWS credentials using one of:\n"
-            "  1. AWS CLI: aws configure\n"
-            "  2. Environment variables: AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY\n"
-            "  3. AWS credentials file: ~/.aws/credentials\n"
-            "  4. Set TXP_AWS_PROFILE environment variable or use --aws-profile flag"
-        )
+        # Detect expired token from details
+        is_expired = details and "expired" in details.lower()
+        
+        if is_expired:
+            suggestion = (
+                "Your AWS credentials have expired. Refresh them:\n"
+                "  • If using SSO: aws sso login --profile your-profile\n"
+                "  • If using temporary creds: request new credentials\n"
+                "  • Then retry your command"
+            )
+        else:
+            suggestion = (
+                "Configure AWS credentials:\n"
+                "  1. aws configure --profile your-profile\n"
+                "  2. toxp config set aws-profile your-profile\n"
+                "  3. Verify: aws sts get-caller-identity --profile your-profile"
+            )
         super().__init__(message, suggestion=suggestion, details=details)
 
 
-class ProviderError(TxpError):
+class ProviderError(ToxpError):
     """Raised when there is an error with the LLM provider.
     
     This is a general error for provider-related issues that don't
@@ -144,7 +154,7 @@ class ProviderError(TxpError):
         super().__init__(message, suggestion=suggestion, details=details)
 
 
-class ModelNotFoundError(TxpError):
+class ModelNotFoundError(ToxpError):
     """Raised when the specified model is not available.
     
     Requirements: 10.2
@@ -184,7 +194,7 @@ class ModelNotFoundError(TxpError):
         super().__init__(message, suggestion=suggestion)
 
 
-class ThrottlingError(TxpError):
+class ThrottlingError(ToxpError):
     """Raised when rate limiting occurs despite retries.
     
     Requirements: 10.3
@@ -208,7 +218,7 @@ class ThrottlingError(TxpError):
         
         suggestion_parts = []
         if num_agents and num_agents > 4:
-            suggestion_parts.append(f"Reduce num-agents (currently {num_agents}): txp config set num-agents {max(2, num_agents // 2)}")
+            suggestion_parts.append(f"Reduce num-agents (currently {num_agents}): toxp config set num-agents {max(2, num_agents // 2)}")
         suggestion_parts.append("Wait a few minutes before retrying")
         suggestion_parts.append("Check your AWS Bedrock quota limits")
         
@@ -219,7 +229,7 @@ class ThrottlingError(TxpError):
         super().__init__(message, suggestion=suggestion, details=details)
 
 
-class InsufficientAgentsError(TxpError):
+class InsufficientAgentsError(ToxpError):
     """Raised when too few agents succeed to produce a reliable result.
     
     Requirements: 6.5
@@ -253,7 +263,7 @@ class InsufficientAgentsError(TxpError):
         
         suggestion = (
             "Try reducing num-agents or check your API quotas.\n"
-            "  Use: txp config set num-agents <lower_value>"
+            "  Use: toxp config set num-agents <lower_value>"
         )
         
         details = None
@@ -264,7 +274,7 @@ class InsufficientAgentsError(TxpError):
         super().__init__(message, suggestion=suggestion, details=details)
 
 
-class NetworkError(TxpError):
+class NetworkError(ToxpError):
     """Raised when there is a network connectivity issue.
     
     Requirements: 10.6
@@ -287,7 +297,7 @@ class NetworkError(TxpError):
         super().__init__(message, suggestion=suggestion, details=details)
 
 
-class TimeoutError(TxpError):
+class TimeoutError(ToxpError):
     """Raised when an operation times out.
     
     Requirements: 10.7

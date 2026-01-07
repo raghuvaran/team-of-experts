@@ -4,7 +4,7 @@ This module implements an AdaptiveRateLimiter that controls concurrent API reque
 based on model quotas to prevent throttling. It uses semaphore-based concurrency
 control and implements exponential backoff on throttling.
 
-Feature: txp-cli
+Feature: toxp-cli
 Requirements: 6.3
 """
 

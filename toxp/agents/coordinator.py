@@ -5,10 +5,10 @@ import re
 import time
 from typing import Callable, List, Literal, Optional
 
-from txp.models.response import AgentResponse, CoordinatorResponse
-from txp.models.query import Query
-from txp.providers.base import BaseProvider
-from txp.agents.prompts import format_coordinator_prompt
+from toxp.models.response import AgentResponse, CoordinatorResponse
+from toxp.models.query import Query
+from toxp.providers.base import BaseProvider
+from toxp.agents.prompts import format_coordinator_prompt
 
 
 logger = logging.getLogger(__name__)

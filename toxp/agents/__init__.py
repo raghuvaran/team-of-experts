@@ -1,4 +1,4 @@
-"""Agents module for TXP CLI.
+"""Agents module for TOXP CLI.
 
 Contains reasoning agents and coordinator agent for parallel test-time compute.
 """
