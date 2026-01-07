@@ -1,6 +1,6 @@
-"""Property-based tests for TXP provider architecture.
+"""Property-based tests for TOXP provider architecture.
 
-Feature: txp-cli
+Feature: toxp-cli
 """
 
 from typing import AsyncIterator
@@ -9,7 +9,7 @@ import pytest
 from hypothesis import given, strategies as st, settings, assume
 from pydantic import ValidationError
 
-from txp.providers import BaseProvider, ProviderResponse, ProviderRegistry
+from toxp.providers import BaseProvider, ProviderResponse, ProviderRegistry
 
 
 # Create a concrete test provider for testing the registry
@@ -454,7 +454,7 @@ class TestProviderResponseStructure:
 
 
 # Import BedrockProvider for model ID validation tests
-from txp.providers.bedrock import BedrockProvider
+from toxp.providers.bedrock import BedrockProvider
 
 
 # Strategy for generating valid Claude model IDs

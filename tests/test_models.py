@@ -1,13 +1,13 @@
-"""Property-based tests for TXP data models.
+"""Property-based tests for TOXP data models.
 
-Feature: txp-cli
+Feature: toxp-cli
 """
 
 import pytest
 from hypothesis import given, strategies as st, settings
 
-from txp.models import CoordinatorResponse
-from txp.models.response import VALID_CONFIDENCE_LEVELS
+from toxp.models import CoordinatorResponse
+from toxp.models.response import VALID_CONFIDENCE_LEVELS
 
 
 class TestCoordinatorConfidenceLevel:

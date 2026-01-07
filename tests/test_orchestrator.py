@@ -1,6 +1,6 @@
-"""Property-based tests for TXP orchestrator.
+"""Property-based tests for TOXP orchestrator.
 
-Feature: txp-cli
+Feature: toxp-cli
 """
 
 import asyncio
@@ -10,10 +10,10 @@ from unittest.mock import AsyncMock
 import pytest
 from hypothesis import given, strategies as st, settings
 
-from txp.models.query import Query
-from txp.models.response import AgentResponse, CoordinatorResponse
-from txp.orchestrator import Orchestrator, InsufficientAgentsError
-from txp.providers.base import BaseProvider, ProviderResponse
+from toxp.models.query import Query
+from toxp.models.response import AgentResponse, CoordinatorResponse
+from toxp.orchestrator import Orchestrator, InsufficientAgentsError
+from toxp.providers.base import BaseProvider, ProviderResponse
 
 
 class MockProvider(BaseProvider):

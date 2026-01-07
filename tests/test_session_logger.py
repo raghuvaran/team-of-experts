@@ -1,6 +1,6 @@
-"""Property-based tests for TXP session logging.
+"""Property-based tests for TOXP session logging.
 
-Feature: txp-cli
+Feature: toxp-cli
 """
 
 import os
@@ -13,8 +13,8 @@ from pathlib import Path
 import pytest
 from hypothesis import given, strategies as st, settings, assume
 
-from txp.logging import SessionLogger
-from txp.models import Query, AgentResponse, CoordinatorResponse, Result
+from toxp.logging import SessionLogger
+from toxp.models import Query, AgentResponse, CoordinatorResponse, Result
 
 
 # Strategies for generating valid test data
@@ -111,7 +111,7 @@ class TestLogFileCreation:
     Validates: Requirements 8.1, 8.2
     
     For any logged session with logging enabled, the log file SHALL:
-    - Be created in `~/.txp/logs/sessions/` (or custom logs_dir)
+    - Be created in `~/.toxp/logs/sessions/` (or custom logs_dir)
     - Have filename matching pattern `YYYY-MM-DD_HHMMSS_{query_id}.md`
     """
 
@@ -211,7 +211,7 @@ class TestLogFileCreation:
             
             # Verify it starts with markdown header
             content = filepath.read_text()
-            assert content.startswith("# TXP Session Log")
+            assert content.startswith("# TOXP Session Log")
 
 
 

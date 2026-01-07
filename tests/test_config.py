@@ -1,6 +1,6 @@
-"""Property-based tests for TXP configuration management.
+"""Property-based tests for TOXP configuration management.
 
-Feature: txp-cli
+Feature: toxp-cli
 """
 
 import tempfile
@@ -9,8 +9,8 @@ from pathlib import Path
 import pytest
 from hypothesis import given, strategies as st, settings, assume
 
-from txp.config import (
-    TxpConfig,
+from toxp.config import (
+    ToxpConfig,
     ConfigManager,
     VALID_CONFIG_KEYS,
     _normalize_key,
@@ -213,9 +213,9 @@ class TestConfigPrecedence:
             manager.set("aws-profile", file_value)
             
             # Set env value
-            old_env = os.environ.get("TXP_AWS_PROFILE")
+            old_env = os.environ.get("TOXP_AWS_PROFILE")
             try:
-                os.environ["TXP_AWS_PROFILE"] = env_value
+                os.environ["TOXP_AWS_PROFILE"] = env_value
                 
                 # Load config (should have env value due to ENV > file)
                 config = manager.load()
@@ -227,9 +227,9 @@ class TestConfigPrecedence:
                 
             finally:
                 if old_env is None:
-                    os.environ.pop("TXP_AWS_PROFILE", None)
+                    os.environ.pop("TOXP_AWS_PROFILE", None)
                 else:
-                    os.environ["TXP_AWS_PROFILE"] = old_env
+                    os.environ["TOXP_AWS_PROFILE"] = old_env
 
     @given(
         file_value=valid_aws_profiles,
@@ -254,9 +254,9 @@ class TestConfigPrecedence:
             manager.set("aws-profile", file_value)
             
             # Set env value
-            old_env = os.environ.get("TXP_AWS_PROFILE")
+            old_env = os.environ.get("TOXP_AWS_PROFILE")
             try:
-                os.environ["TXP_AWS_PROFILE"] = env_value
+                os.environ["TOXP_AWS_PROFILE"] = env_value
                 
                 # Load config (should have env value)
                 config = manager.load()
@@ -264,9 +264,9 @@ class TestConfigPrecedence:
                 
             finally:
                 if old_env is None:
-                    os.environ.pop("TXP_AWS_PROFILE", None)
+                    os.environ.pop("TOXP_AWS_PROFILE", None)
                 else:
-                    os.environ["TXP_AWS_PROFILE"] = old_env
+                    os.environ["TOXP_AWS_PROFILE"] = old_env
 
     @given(file_value=valid_aws_profiles)
     @settings(max_examples=100)
@@ -278,13 +278,13 @@ class TestConfigPrecedence:
         """
         import os
         
-        default_value = TxpConfig.get_defaults().aws_profile
+        default_value = ToxpConfig.get_defaults().aws_profile
         assume(file_value != default_value)
         
         # Ensure no env var interference
-        old_env = os.environ.get("TXP_AWS_PROFILE")
+        old_env = os.environ.get("TOXP_AWS_PROFILE")
         try:
-            os.environ.pop("TXP_AWS_PROFILE", None)
+            os.environ.pop("TOXP_AWS_PROFILE", None)
             
             with tempfile.TemporaryDirectory() as tmpdir:
                 config_dir = Path(tmpdir)
@@ -299,7 +299,7 @@ class TestConfigPrecedence:
                 
         finally:
             if old_env is not None:
-                os.environ["TXP_AWS_PROFILE"] = old_env
+                os.environ["TOXP_AWS_PROFILE"] = old_env
 
     @given(num_agents=valid_num_agents)
     @settings(max_examples=100)
@@ -311,13 +311,13 @@ class TestConfigPrecedence:
         """
         import os
         
-        default_value = TxpConfig.get_defaults().num_agents
+        default_value = ToxpConfig.get_defaults().num_agents
         assume(num_agents != default_value)
         
         # Ensure no env var interference
-        old_env = os.environ.get("TXP_NUM_AGENTS")
+        old_env = os.environ.get("TOXP_NUM_AGENTS")
         try:
-            os.environ.pop("TXP_NUM_AGENTS", None)
+            os.environ.pop("TOXP_NUM_AGENTS", None)
             
             with tempfile.TemporaryDirectory() as tmpdir:
                 config_dir = Path(tmpdir)
@@ -337,7 +337,7 @@ class TestConfigPrecedence:
                 
         finally:
             if old_env is not None:
-                os.environ["TXP_NUM_AGENTS"] = old_env
+                os.environ["TOXP_NUM_AGENTS"] = old_env
 
 
 
@@ -380,9 +380,9 @@ class TestConfigReset:
         
         # Clear any env vars that might interfere
         env_vars_to_clear = [
-            "TXP_AWS_PROFILE", "TXP_PROVIDER", "TXP_REGION", 
-            "TXP_NUM_AGENTS", "TXP_TEMPERATURE", "TXP_LOG_ENABLED",
-            "TXP_LOG_RETENTION_DAYS"
+            "TOXP_AWS_PROFILE", "TOXP_PROVIDER", "TOXP_REGION", 
+            "TOXP_NUM_AGENTS", "TOXP_TEMPERATURE", "TOXP_LOG_ENABLED",
+            "TOXP_LOG_RETENTION_DAYS"
         ]
         old_env = {k: os.environ.get(k) for k in env_vars_to_clear}
         
@@ -413,7 +413,7 @@ class TestConfigReset:
                 
                 # Load and verify all values match defaults
                 config = manager.load()
-                defaults = TxpConfig.get_defaults()
+                defaults = ToxpConfig.get_defaults()
                 
                 assert config.provider == defaults.provider
                 assert config.aws_profile == defaults.aws_profile
@@ -443,15 +443,15 @@ class TestConfigReset:
         """
         import os
         
-        old_env = os.environ.get("TXP_NUM_AGENTS")
+        old_env = os.environ.get("TOXP_NUM_AGENTS")
         try:
-            os.environ.pop("TXP_NUM_AGENTS", None)
+            os.environ.pop("TOXP_NUM_AGENTS", None)
             
             with tempfile.TemporaryDirectory() as tmpdir:
                 config_dir = Path(tmpdir)
                 manager = ConfigManager(config_dir=config_dir, config_file=config_dir / "config.json")
                 
-                defaults = TxpConfig.get_defaults()
+                defaults = ToxpConfig.get_defaults()
                 
                 # Modify single value
                 manager.set("num-agents", str(num_agents))
@@ -465,7 +465,7 @@ class TestConfigReset:
                 
         finally:
             if old_env is not None:
-                os.environ["TXP_NUM_AGENTS"] = old_env
+                os.environ["TOXP_NUM_AGENTS"] = old_env
 
     def test_reset_creates_file_if_missing(self) -> None:
         """Property: Reset creates config file with defaults if it doesn't exist.
@@ -489,11 +489,11 @@ class TestConfigReset:
             
             # And contain defaults
             import os
-            old_env = {k: os.environ.get(k) for k in ["TXP_AWS_PROFILE"]}
+            old_env = {k: os.environ.get(k) for k in ["TOXP_AWS_PROFILE"]}
             try:
-                os.environ.pop("TXP_AWS_PROFILE", None)
+                os.environ.pop("TOXP_AWS_PROFILE", None)
                 config = manager.load()
-                defaults = TxpConfig.get_defaults()
+                defaults = ToxpConfig.get_defaults()
                 assert config.to_dict() == defaults.to_dict()
             finally:
                 for k, v in old_env.items():

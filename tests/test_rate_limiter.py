@@ -1,6 +1,6 @@
-"""Property-based tests for TXP rate limiter.
+"""Property-based tests for TOXP rate limiter.
 
-Feature: txp-cli
+Feature: toxp-cli
 """
 
 import asyncio
@@ -9,7 +9,7 @@ from typing import List
 import pytest
 from hypothesis import given, strategies as st, settings
 
-from txp.utils import AdaptiveRateLimiter, QuotaInfo, get_quota_for_model
+from toxp.utils import AdaptiveRateLimiter, QuotaInfo, get_quota_for_model
 
 
 # Strategy for generating valid model IDs

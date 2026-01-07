@@ -1,9 +1,9 @@
-"""Integration tests for TXP CLI.
+"""Integration tests for TOXP CLI.
 
-These tests verify end-to-end functionality of the TXP CLI tool,
+These tests verify end-to-end functionality of the TOXP CLI tool,
 including query flow, config commands, and error scenarios.
 
-Feature: txp-cli
+Feature: toxp-cli
 Requirements: 1.1-1.4, 2.1-2.10, 3.1-3.5, 9.1-9.9, 10.1-10.8
 """
 
@@ -18,7 +18,7 @@ from unittest.mock import patch
 
 import pytest
 
-from txp.cli import (
+from toxp.cli import (
     create_parser,
     parse_args,
     get_query_text,
@@ -26,20 +26,20 @@ from txp.cli import (
     handle_query_command,
     main,
 )
-from txp.config import ConfigManager, TxpConfig
-from txp.exceptions import (
+from toxp.config import ConfigManager, ToxpConfig
+from toxp.exceptions import (
     CredentialsError,
     InsufficientAgentsError,
     ModelNotFoundError,
     ThrottlingError,
 )
-from txp.models.query import Query
-from txp.models.response import AgentResponse, CoordinatorResponse
-from txp.models.result import Result
-from txp.orchestrator import Orchestrator
-from txp.output.formatter import OutputFormatter
-from txp.providers.base import BaseProvider, ProviderResponse
-from txp.providers.registry import ProviderRegistry
+from toxp.models.query import Query
+from toxp.models.response import AgentResponse, CoordinatorResponse
+from toxp.models.result import Result
+from toxp.orchestrator import Orchestrator
+from toxp.output.formatter import OutputFormatter
+from toxp.providers.base import BaseProvider, ProviderResponse
+from toxp.providers.registry import ProviderRegistry
 
 
 # =============================================================================
@@ -233,7 +233,7 @@ class TestConfigCommandFlow:
         expected_keys = {
             "provider", "aws_profile", "region", "model", "num_agents",
             "temperature", "coordinator_temperature", "max_tokens",
-            "log_enabled", "log_retention_days"
+            "log_enabled", "log_retention_days", "max_concurrency"
         }
         assert set(config.keys()) == expected_keys
         
@@ -257,7 +257,7 @@ class TestConfigCommandFlow:
         config_manager.reset()
         
         # Verify defaults are restored
-        defaults = TxpConfig.get_defaults()
+        defaults = ToxpConfig.get_defaults()
         config = config_manager.load()
         
         assert config.num_agents == defaults.num_agents
@@ -309,9 +309,9 @@ class TestConfigCommandFlow:
         config_manager.set("aws-profile", "file-profile")
         
         # Set env value
-        old_env = os.environ.get("TXP_AWS_PROFILE")
+        old_env = os.environ.get("TOXP_AWS_PROFILE")
         try:
-            os.environ["TXP_AWS_PROFILE"] = "env-profile"
+            os.environ["TOXP_AWS_PROFILE"] = "env-profile"
             
             # Load config (should have env value)
             config = config_manager.load()
@@ -323,9 +323,9 @@ class TestConfigCommandFlow:
             
         finally:
             if old_env is None:
-                os.environ.pop("TXP_AWS_PROFILE", None)
+                os.environ.pop("TOXP_AWS_PROFILE", None)
             else:
-                os.environ["TXP_AWS_PROFILE"] = old_env
+                os.environ["TOXP_AWS_PROFILE"] = old_env
 
 
 # =============================================================================
@@ -707,7 +707,7 @@ class TestSessionLoggingIntegration:
 
     def test_session_log_created_on_query(self, temp_config_dir):
         """Test that session log is created after query."""
-        from txp.logging.session_logger import SessionLogger
+        from toxp.logging.session_logger import SessionLogger
         
         logs_dir = temp_config_dir / "logs" / "sessions"
         logger = SessionLogger(
@@ -753,7 +753,7 @@ class TestSessionLoggingIntegration:
 
     def test_session_log_disabled(self, temp_config_dir):
         """Test that no log is created when logging is disabled."""
-        from txp.logging.session_logger import SessionLogger
+        from toxp.logging.session_logger import SessionLogger
         
         logs_dir = temp_config_dir / "logs" / "sessions"
         logger = SessionLogger(
@@ -790,7 +790,7 @@ class TestProviderRegistryIntegration:
         """Test that Bedrock provider is registered by default."""
         # Clear and re-register
         ProviderRegistry.clear()
-        from txp.providers.bedrock import BedrockProvider
+        from toxp.providers.bedrock import BedrockProvider
         ProviderRegistry.register("bedrock", BedrockProvider)
         
         assert ProviderRegistry.is_registered("bedrock")
