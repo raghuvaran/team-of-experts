@@ -546,6 +546,11 @@ class TestCLIArgumentParsing:
         args, _ = parse_args(["--quiet", "test query"])
         assert args.quiet is True
 
+    def test_quiet_flag_short(self):
+        """Test -Q short flag for quiet is parsed correctly."""
+        args, _ = parse_args(["-Q", "test query"])
+        assert args.quiet is True
+
     def test_no_log_flag(self):
         """Test --no-log flag is parsed correctly."""
         args, _ = parse_args(["--no-log", "test query"])
@@ -556,6 +561,11 @@ class TestCLIArgumentParsing:
         args, _ = parse_args(["--num-agents", "8", "test query"])
         assert args.num_agents == 8
 
+    def test_num_agents_option_short(self):
+        """Test -n short flag for num-agents is parsed correctly."""
+        args, _ = parse_args(["-n", "8", "test query"])
+        assert args.num_agents == 8
+
     def test_temperature_option(self):
         """Test --temperature option is parsed correctly."""
         args, _ = parse_args(["--temperature", "0.5", "test query"])
@@ -564,6 +574,11 @@ class TestCLIArgumentParsing:
     def test_model_option(self):
         """Test --model option is parsed correctly."""
         args, _ = parse_args(["--model", "custom-model", "test query"])
+        assert args.model == "custom-model"
+
+    def test_model_option_short(self):
+        """Test -m short flag for model is parsed correctly."""
+        args, _ = parse_args(["-m", "custom-model", "test query"])
         assert args.model == "custom-model"
 
     def test_aws_profile_option(self):
@@ -580,6 +595,24 @@ class TestCLIArgumentParsing:
         """Test --output option is parsed correctly."""
         args, _ = parse_args(["--output", "result.txt", "test query"])
         assert args.output_file == "result.txt"
+
+    def test_max_concurrency_option(self):
+        """Test --max-concurrency option is parsed correctly."""
+        args, _ = parse_args(["--max-concurrency", "10", "test query"])
+        assert args.max_concurrency == 10
+
+    def test_max_concurrency_option_short(self):
+        """Test -c short flag for max-concurrency is parsed correctly."""
+        args, _ = parse_args(["-c", "10", "test query"])
+        assert args.max_concurrency == 10
+
+    def test_combined_short_flags(self):
+        """Test multiple short flags can be used together."""
+        args, _ = parse_args(["-n", "8", "-m", "test-model", "-c", "5", "-Q", "test query"])
+        assert args.num_agents == 8
+        assert args.model == "test-model"
+        assert args.max_concurrency == 5
+        assert args.quiet is True
 
     def test_config_subcommand_set(self):
         """Test config set subcommand parsing."""

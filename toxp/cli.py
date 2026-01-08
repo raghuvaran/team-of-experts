@@ -72,13 +72,13 @@ For more information, visit: https://github.com/your-repo/team-of-experts
                         help="Write final answer to FILE")
     parser.add_argument("-v", "--verbose", action="store_true",
                         help="Show detailed output including debug info and stack traces on errors")
-    parser.add_argument("--quiet", action="store_true",
+    parser.add_argument("-Q", "--quiet", action="store_true",
                         help="Only show the final answer (no progress or status)")
     parser.add_argument("--no-log", action="store_true",
                         help="Skip session logging for this execution")
-    parser.add_argument("--num-agents", type=int, metavar="N",
+    parser.add_argument("-n", "--num-agents", type=int, metavar="N",
                         help="Number of reasoning agents to spawn (2-32, default: 16)")
-    parser.add_argument("--model", metavar="ID",
+    parser.add_argument("-m", "--model", metavar="ID",
                         help="Model ID to use (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0)")
     parser.add_argument("--temperature", type=float, metavar="T",
                         help="Sampling temperature for agents (0.0-1.0, default: 0.9)")
@@ -86,7 +86,7 @@ For more information, visit: https://github.com/your-repo/team-of-experts
                         help="AWS profile for credentials (default: default)")
     parser.add_argument("--region", metavar="REGION",
                         help="AWS region for Bedrock (default: us-east-1)")
-    parser.add_argument("--max-concurrency", type=int, metavar="N",
+    parser.add_argument("-c", "--max-concurrency", type=int, metavar="N",
                         help="Maximum concurrent API requests (default: auto-calculated based on model quotas)")
     
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
@@ -141,14 +141,14 @@ def parse_args(argv: Optional[List[str]] = None) -> Tuple[argparse.Namespace, Li
     parser.add_argument("-q", "--query", dest="query_flag", help="Query text")
     parser.add_argument("-o", "--output", dest="output_file", help="Write answer to file")
     parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
-    parser.add_argument("--quiet", action="store_true", help="Only show final answer")
+    parser.add_argument("-Q", "--quiet", action="store_true", help="Only show final answer")
     parser.add_argument("--no-log", action="store_true", help="Skip session logging")
-    parser.add_argument("--num-agents", type=int, help="Number of agents (2-32)")
-    parser.add_argument("--model", help="Model ID to use")
+    parser.add_argument("-n", "--num-agents", type=int, help="Number of agents (2-32)")
+    parser.add_argument("-m", "--model", help="Model ID to use")
     parser.add_argument("--temperature", type=float, help="Temperature (0.0-1.0)")
     parser.add_argument("--aws-profile", help="AWS profile for credentials")
     parser.add_argument("--region", help="AWS region for Bedrock")
-    parser.add_argument("--max-concurrency", type=int, help="Maximum concurrent API requests")
+    parser.add_argument("-c", "--max-concurrency", type=int, help="Maximum concurrent API requests")
     
     args, remaining = parser.parse_known_args(argv)
     args.command = None  # Not a subcommand
