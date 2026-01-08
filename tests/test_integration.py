@@ -22,6 +22,7 @@ from toxp.cli import (
     create_parser,
     parse_args,
     get_query_text,
+    read_stdin_query,
     handle_config_command,
     handle_query_command,
     main,
@@ -353,11 +354,17 @@ class TestQueryFlow:
         query = get_query_text(args, remaining)
         assert query == "What is 2+2?"
 
-    def test_positional_takes_precedence_over_flag(self):
-        """Test that positional argument takes precedence over --query flag."""
-        args, remaining = parse_args(["positional query", "--query", "flag query"])
+    def test_query_flag_takes_precedence_over_positional(self):
+        """Test that --query flag takes precedence over positional argument."""
+        args, remaining = parse_args(["--query", "flag query", "positional query"])
         query = get_query_text(args, remaining)
-        assert query == "positional query"
+        assert query == "flag query"
+
+    def test_query_flag_short_takes_precedence_over_positional(self):
+        """Test that -q flag takes precedence over positional argument."""
+        args, remaining = parse_args(["-q", "flag query", "positional query"])
+        query = get_query_text(args, remaining)
+        assert query == "flag query"
 
     def test_end_to_end_query_with_mock_provider(self, temp_config_dir):
         """Test complete query flow with mocked provider."""
@@ -816,3 +823,232 @@ class TestProviderRegistryIntegration:
         
         assert "test1" in providers
         assert "test2" in providers
+
+
+# =============================================================================
+# Stdin Piping Integration Tests
+# =============================================================================
+
+class TestStdinPiping:
+    """Integration tests for stdin piping with CLI flags.
+    
+    These tests verify the fix for the bug where piping stdin to toxp
+    fails when CLI flags are also provided. The root cause was that
+    unrecognized flags became 'remaining' args and were returned as
+    the query before stdin was ever read.
+    
+    The fix ensures precedence: -q flag > positional args > stdin
+    """
+
+    def test_stdin_read_when_no_other_query_source(self):
+        """Test that stdin is read when no -q flag or positional args provided."""
+        args, remaining = parse_args(["--verbose"])
+        
+        # Mock stdin with query text
+        with patch('toxp.cli.read_stdin_query', return_value="stdin query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "stdin query"
+
+    def test_stdin_with_num_agents_flag(self):
+        """Test: echo 'query' | toxp --num-agents 7 should work."""
+        args, remaining = parse_args(["--num-agents", "7"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="piped query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "piped query"
+        assert args.num_agents == 7
+
+    def test_stdin_with_multiple_flags(self):
+        """Test stdin works with multiple CLI flags."""
+        args, remaining = parse_args([
+            "--num-agents", "8",
+            "--temperature", "0.5",
+            "--verbose",
+            "--model", "test-model"
+        ])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="complex piped query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "complex piped query"
+        assert args.num_agents == 8
+        assert args.temperature == 0.5
+        assert args.verbose is True
+        assert args.model == "test-model"
+
+    def test_stdin_with_output_flag(self):
+        """Test stdin works with --output flag."""
+        args, remaining = parse_args(["--output", "result.txt"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="query for file"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "query for file"
+        assert args.output_file == "result.txt"
+
+    def test_stdin_with_quiet_flag(self):
+        """Test stdin works with --quiet flag."""
+        args, remaining = parse_args(["--quiet"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="quiet query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "quiet query"
+        assert args.quiet is True
+
+    def test_stdin_with_region_and_profile(self):
+        """Test stdin works with AWS-related flags."""
+        args, remaining = parse_args([
+            "--region", "eu-west-1",
+            "--aws-profile", "my-profile"
+        ])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="aws query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "aws query"
+        assert args.region == "eu-west-1"
+        assert args.aws_profile == "my-profile"
+
+    def test_query_flag_takes_precedence_over_stdin(self):
+        """Test that -q flag takes precedence over stdin."""
+        args, remaining = parse_args(["-q", "explicit query", "--verbose"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="stdin query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "explicit query"
+
+    def test_positional_takes_precedence_over_stdin(self):
+        """Test that positional args take precedence over stdin."""
+        args, remaining = parse_args(["positional query", "--verbose"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="stdin query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "positional query"
+
+    def test_stdin_empty_returns_none(self):
+        """Test that empty stdin returns None."""
+        args, remaining = parse_args(["--verbose"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value=None):
+            query = get_query_text(args, remaining)
+        
+        assert query is None
+
+    def test_stdin_whitespace_only_returns_none(self):
+        """Test that whitespace-only stdin returns None."""
+        args, remaining = parse_args(["--num-agents", "5"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value=None):  # read_stdin_query strips and returns None for empty
+            query = get_query_text(args, remaining)
+        
+        assert query is None
+
+    def test_stdin_multiline_query(self):
+        """Test stdin with multiline query text."""
+        args, remaining = parse_args(["--verbose"])
+        
+        multiline = "Line 1\nLine 2\nLine 3"
+        with patch('toxp.cli.read_stdin_query', return_value=multiline):
+            query = get_query_text(args, remaining)
+        
+        assert query == multiline
+        assert "\n" in query
+
+    def test_stdin_with_all_flags_combined(self):
+        """Test stdin works with all common flags combined."""
+        args, remaining = parse_args([
+            "--num-agents", "12",
+            "--temperature", "0.7",
+            "--model", "custom-model",
+            "--region", "us-west-2",
+            "--aws-profile", "prod",
+            "--output", "out.txt",
+            "--verbose",
+            "--no-log",
+            "--max-concurrency", "5"
+        ])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="full featured query"):
+            query = get_query_text(args, remaining)
+        
+        assert query == "full featured query"
+        assert args.num_agents == 12
+        assert args.temperature == 0.7
+        assert args.model == "custom-model"
+        assert args.region == "us-west-2"
+        assert args.aws_profile == "prod"
+        assert args.output_file == "out.txt"
+        assert args.verbose is True
+        assert args.no_log is True
+        assert args.max_concurrency == 5
+
+    def test_read_stdin_query_with_tty(self):
+        """Test read_stdin_query returns None when stdin is a TTY."""
+        with patch('sys.stdin') as mock_stdin:
+            mock_stdin.isatty.return_value = True
+            result = read_stdin_query()
+        
+        assert result is None
+
+    def test_read_stdin_query_with_piped_input(self):
+        """Test read_stdin_query reads piped input correctly."""
+        with patch('sys.stdin') as mock_stdin:
+            mock_stdin.isatty.return_value = False
+            mock_stdin.read.return_value = "  piped content  \n"
+            result = read_stdin_query()
+        
+        assert result == "piped content"
+
+    def test_read_stdin_query_with_empty_pipe(self):
+        """Test read_stdin_query returns None for empty pipe."""
+        with patch('sys.stdin') as mock_stdin:
+            mock_stdin.isatty.return_value = False
+            mock_stdin.read.return_value = "   \n  "
+            result = read_stdin_query()
+        
+        assert result is None
+
+    def test_read_stdin_query_handles_exception(self):
+        """Test read_stdin_query handles read exceptions gracefully."""
+        with patch('sys.stdin') as mock_stdin:
+            mock_stdin.isatty.return_value = False
+            mock_stdin.read.side_effect = IOError("Read error")
+            result = read_stdin_query()
+        
+        assert result is None
+
+    def test_precedence_order_query_flag_first(self):
+        """Test complete precedence: -q > positional > stdin."""
+        # All three sources provided
+        args, remaining = parse_args(["-q", "flag query", "positional"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="stdin query"):
+            query = get_query_text(args, remaining)
+        
+        # -q flag should win
+        assert query == "flag query"
+
+    def test_precedence_order_positional_second(self):
+        """Test precedence: positional > stdin when no -q flag."""
+        args, remaining = parse_args(["positional query"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="stdin query"):
+            query = get_query_text(args, remaining)
+        
+        # positional should win over stdin
+        assert query == "positional query"
+
+    def test_precedence_order_stdin_last(self):
+        """Test precedence: stdin is fallback when no -q or positional."""
+        args, remaining = parse_args(["--verbose"])
+        
+        with patch('toxp.cli.read_stdin_query', return_value="stdin query"):
+            query = get_query_text(args, remaining)
+        
+        # stdin should be used as fallback
+        assert query == "stdin query"

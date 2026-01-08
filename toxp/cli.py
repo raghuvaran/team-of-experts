@@ -167,11 +167,11 @@ def read_stdin_query() -> Optional[str]:
 
 
 def get_query_text(args: argparse.Namespace, remaining: List[str]) -> Optional[str]:
-    """Get query with precedence: positional > --query > stdin."""
-    if remaining:
-        return " ".join(remaining)
+    """Get query with precedence: --query > positional > stdin."""
     if args.query_flag:
         return args.query_flag
+    if remaining:
+        return " ".join(remaining)
     return read_stdin_query()
 
 
