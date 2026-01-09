@@ -77,7 +77,7 @@ For more information, visit: https://github.com/your-repo/team-of-experts
     parser.add_argument("--no-log", action="store_true",
                         help="Skip session logging for this execution")
     parser.add_argument("-n", "--num-agents", type=int, metavar="N",
-                        help="Number of reasoning agents to spawn (2-32, default: 16)")
+                        help="Number of reasoning agents to spawn (2-32, default: 15)")
     parser.add_argument("-m", "--model", metavar="ID",
                         help="Model ID to use (e.g., us.anthropic.claude-sonnet-4-5-20250929-v1:0)")
     parser.add_argument("--temperature", type=float, metavar="T",

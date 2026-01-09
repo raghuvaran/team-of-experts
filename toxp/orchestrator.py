@@ -51,7 +51,7 @@ class Orchestrator:
     def __init__(
         self,
         provider: BaseProvider,
-        num_agents: int = 16,
+        num_agents: int = 15,
         temperature: float = 0.9,
         coordinator_temperature: float = 0.7,
         max_tokens: int = 8192,
@@ -62,7 +62,7 @@ class Orchestrator:
         
         Args:
             provider: LLM provider for model invocation
-            num_agents: Number of reasoning agents (2-32, default: 16)
+            num_agents: Number of reasoning agents (2-32, default: 15)
             temperature: Agent sampling temperature (default: 0.9 for diversity)
             coordinator_temperature: Coordinator temperature (default: 0.7)
             max_tokens: Maximum tokens per response (default: 8192)

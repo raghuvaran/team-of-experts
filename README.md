@@ -63,7 +63,7 @@ toxp config reset                   # reset defaults
 |-----|---------|-------------|
 | `aws-profile` | `default` | AWS profile |
 | `region` | `us-east-1` | AWS region |
-| `num-agents` | `16` | Parallel agents (2-32) |
+| `num-agents` | `15` | Parallel agents (2-32) |
 | `temperature` | `0.9` | Agent temperature |
 | `model` | `claude-sonnet-4-5` | Model ID |
 
