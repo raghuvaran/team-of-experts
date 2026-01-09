@@ -7,6 +7,8 @@ and exponential backoff retry logic.
 
 import asyncio
 import re
+import ssl
+import threading
 import time
 from typing import Any, AsyncIterator, Dict, Optional
 
@@ -26,6 +28,34 @@ from .base import BaseProvider, ProviderResponse
 
 # Keep BedrockProviderError as an alias for backward compatibility
 BedrockProviderError = ProviderError
+
+# Lock for SSL initialization to prevent race conditions in OpenSSL cert store
+# This is a workaround for OpenSSL 3.x thread safety issues on macOS
+_ssl_init_lock = threading.Lock()
+_ssl_initialized = False
+
+
+def _ensure_ssl_initialized() -> None:
+    """Pre-initialize SSL context to avoid race conditions during concurrent handshakes.
+    
+    OpenSSL 3.x has thread safety issues with X509_STORE_CTX when multiple threads
+    perform SSL handshakes simultaneously. By pre-loading the certificate store
+    in a single-threaded context, we avoid the race condition.
+    """
+    global _ssl_initialized
+    if _ssl_initialized:
+        return
+    
+    with _ssl_init_lock:
+        if _ssl_initialized:
+            return
+        
+        # Create a default SSL context and load system certificates
+        # This pre-populates the certificate store before concurrent access
+        ctx = ssl.create_default_context()
+        ctx.load_default_certs()
+        
+        _ssl_initialized = True
 
 
 class BedrockProvider(BaseProvider):
@@ -86,10 +116,15 @@ class BedrockProvider(BaseProvider):
         Raises:
             CredentialsError: If AWS credentials are not configured
         """
+        # Pre-initialize SSL to avoid race conditions in concurrent handshakes
+        _ensure_ssl_initialized()
+        
         boto_config = BotoConfig(
             read_timeout=self.timeout_seconds,
             connect_timeout=30,
             retries={"max_attempts": 0},  # We handle retries ourselves
+            # Enable connection pooling to reuse SSL connections
+            max_pool_connections=10,
         )
         
         try:
