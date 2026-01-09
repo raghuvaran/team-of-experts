@@ -71,7 +71,7 @@ class ToxpConfig(BaseModel):
         description="Model ID to use",
     )
     num_agents: int = Field(
-        default=16,
+        default=15,
         ge=2,
         le=32,
         description="Number of reasoning agents (2-32)",
