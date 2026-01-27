@@ -350,6 +350,9 @@ class BedrockProvider(BaseProvider):
             ModelNotFoundError: If model is not found
             BedrockProviderError: For other API errors
         """
+        import queue as queue_module
+        from concurrent.futures import ThreadPoolExecutor
+        
         messages = [
             {
                 "role": "user",
@@ -363,53 +366,64 @@ class BedrockProvider(BaseProvider):
             "temperature": temperature,
             "maxTokens": max_tokens,
         }
+        
+        # Use thread-safe queue for cross-thread communication
+        token_queue: queue_module.Queue[str | None] = queue_module.Queue()
+        error_holder: list = []  # To propagate exceptions from thread
 
-        def _stream():
-            return self.client.converse_stream(
-                modelId=self._model_id,
-                messages=messages,
-                system=system_prompts,
-                inferenceConfig=inference_config,
-            )
+        def _stream_and_process():
+            """Run entire stream in thread, pushing tokens to queue."""
+            try:
+                response = self.client.converse_stream(
+                    modelId=self._model_id,
+                    messages=messages,
+                    system=system_prompts,
+                    inferenceConfig=inference_config,
+                )
+                for event in response.get("stream", []):
+                    if "contentBlockDelta" in event:
+                        delta = event["contentBlockDelta"].get("delta", {})
+                        if "text" in delta:
+                            token_queue.put(delta["text"])
+            except Exception as e:
+                error_holder.append(e)
+            finally:
+                token_queue.put(None)  # Signal end
 
         try:
-            response = await asyncio.get_event_loop().run_in_executor(None, _stream)
+            # Use a dedicated executor to avoid blocking the default pool
+            loop = asyncio.get_running_loop()
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                stream_future = loop.run_in_executor(executor, _stream_and_process)
+                
+                # Yield tokens as they arrive
+                while True:
+                    try:
+                        token = token_queue.get(timeout=0.05)
+                        if token is None:
+                            break
+                        yield token
+                    except queue_module.Empty:
+                        # Check if stream task is done
+                        if stream_future.done():
+                            # Drain remaining tokens
+                            while True:
+                                try:
+                                    token = token_queue.get_nowait()
+                                    if token is None:
+                                        break
+                                    yield token
+                                except queue_module.Empty:
+                                    break
+                            break
+                        await asyncio.sleep(0)  # Yield to event loop
+                
+                # Wait for stream to complete
+                await stream_future
             
-            # Use async queue to yield tokens without blocking the event loop
-            queue: asyncio.Queue[str | None] = asyncio.Queue()
-            
-            def _process_stream():
-                """Process stream in executor thread, pushing tokens to queue."""
-                try:
-                    for event in response.get("stream", []):
-                        if "contentBlockDelta" in event:
-                            delta = event["contentBlockDelta"].get("delta", {})
-                            if "text" in delta:
-                                # Put token in queue (thread-safe)
-                                asyncio.run_coroutine_threadsafe(
-                                    queue.put(delta["text"]),
-                                    asyncio.get_event_loop()
-                                ).result()
-                finally:
-                    # Signal end of stream
-                    asyncio.run_coroutine_threadsafe(
-                        queue.put(None),
-                        asyncio.get_event_loop()
-                    ).result()
-            
-            # Start stream processing in background thread
-            loop = asyncio.get_event_loop()
-            stream_task = loop.run_in_executor(None, _process_stream)
-            
-            # Yield tokens as they arrive
-            while True:
-                token = await queue.get()
-                if token is None:
-                    break
-                yield token
-            
-            # Ensure stream processing completed
-            await stream_task
+            # Re-raise any exception from the stream thread
+            if error_holder:
+                raise error_holder[0]
                         
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")

@@ -98,16 +98,18 @@ class TimelineProgress:
         line.append(f"  {icon} Agent {agent.agent_id:2d} ", style=style if agent.status != AgentStatus.RUNNING else "bold")
         
         if agent.status == AgentStatus.RUNNING:
-            # Show streaming preview instead of animated bar
+            # Show duration and streaming indicator
             line.append(f"{agent.duration:5.1f}s ", style="cyan bold")
+            # Show stream preview if available, otherwise animated dots
             if agent.stream_preview:
-                # Clean up preview: collapse whitespace, truncate
                 preview = " ".join(agent.stream_preview.split())
                 if len(preview) > self.PREVIEW_WIDTH:
                     preview = "..." + preview[-(self.PREVIEW_WIDTH - 3):]
                 line.append(preview, style="dim italic")
             else:
-                line.append("starting...", style="dim")
+                # Animated dots while waiting for first token
+                dots = "." * (1 + int(agent.duration) % 3)
+                line.append(f"streaming{dots}", style="dim")
         elif agent.status.is_done:
             color = "green" if agent.status == AgentStatus.SUCCESS else "red"
             line.append(f"{agent.duration:5.1f}s ", style=color)
