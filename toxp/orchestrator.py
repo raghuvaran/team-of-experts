@@ -235,9 +235,11 @@ class Orchestrator:
                         on_agent_start(agent.agent_id)
                     
                     # Create token callback for this specific agent
+                    # Use default arg to capture agent_id by value, not reference
                     token_callback = None
                     if on_agent_token:
-                        token_callback = lambda token: on_agent_token(agent.agent_id, token)
+                        agent_id = agent.agent_id  # Capture by value
+                        token_callback = lambda token, aid=agent_id: on_agent_token(aid, token)
                     
                     result = await agent.reason(query.text, on_token=token_callback)
                 
