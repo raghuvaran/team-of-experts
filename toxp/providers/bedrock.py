@@ -375,12 +375,41 @@ class BedrockProvider(BaseProvider):
         try:
             response = await asyncio.get_event_loop().run_in_executor(None, _stream)
             
-            # Process stream events
-            for event in response.get("stream", []):
-                if "contentBlockDelta" in event:
-                    delta = event["contentBlockDelta"].get("delta", {})
-                    if "text" in delta:
-                        yield delta["text"]
+            # Use async queue to yield tokens without blocking the event loop
+            queue: asyncio.Queue[str | None] = asyncio.Queue()
+            
+            def _process_stream():
+                """Process stream in executor thread, pushing tokens to queue."""
+                try:
+                    for event in response.get("stream", []):
+                        if "contentBlockDelta" in event:
+                            delta = event["contentBlockDelta"].get("delta", {})
+                            if "text" in delta:
+                                # Put token in queue (thread-safe)
+                                asyncio.run_coroutine_threadsafe(
+                                    queue.put(delta["text"]),
+                                    asyncio.get_event_loop()
+                                ).result()
+                finally:
+                    # Signal end of stream
+                    asyncio.run_coroutine_threadsafe(
+                        queue.put(None),
+                        asyncio.get_event_loop()
+                    ).result()
+            
+            # Start stream processing in background thread
+            loop = asyncio.get_event_loop()
+            stream_task = loop.run_in_executor(None, _process_stream)
+            
+            # Yield tokens as they arrive
+            while True:
+                token = await queue.get()
+                if token is None:
+                    break
+                yield token
+            
+            # Ensure stream processing completed
+            await stream_task
                         
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code", "")
