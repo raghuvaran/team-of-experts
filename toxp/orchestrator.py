@@ -106,6 +106,7 @@ class Orchestrator:
         on_agent_start: Optional[Callable[[int], None]] = None,
         on_agent_complete: Optional[Callable[[int, bool, Optional[str]], None]] = None,
         on_agents_done: Optional[Callable[[], None]] = None,
+        on_agent_token: Optional[Callable[[int, str], None]] = None,
     ) -> Result:
         """Process a query through the full TOXP pipeline.
         
@@ -121,6 +122,7 @@ class Orchestrator:
             on_agent_start: Optional callback when an agent starts (receives agent_id)
             on_agent_complete: Optional callback when agent completes (agent_id, success, error)
             on_agents_done: Optional callback when all agents finish (before coordinator)
+            on_agent_token: Optional callback for agent streaming tokens (agent_id, token)
             
         Returns:
             Result containing all agent responses and coordinator synthesis
@@ -140,6 +142,7 @@ class Orchestrator:
             query,
             on_agent_start=on_agent_start,
             on_agent_complete=on_agent_complete,
+            on_agent_token=on_agent_token,
         )
         
         # Signal that all agents are done (before coordinator starts)
@@ -196,6 +199,7 @@ class Orchestrator:
         query: Query,
         on_agent_start: Optional[Callable[[int], None]] = None,
         on_agent_complete: Optional[Callable[[int, bool, Optional[str]], None]] = None,
+        on_agent_token: Optional[Callable[[int, str], None]] = None,
     ) -> List[AgentResponse]:
         """Spawn reasoning agents with rate-limited concurrency.
         
@@ -206,6 +210,7 @@ class Orchestrator:
             query: The query for agents to process
             on_agent_start: Optional callback when agent starts
             on_agent_complete: Optional callback when agent completes
+            on_agent_token: Optional callback for streaming tokens (agent_id, token)
             
         Returns:
             List of AgentResponse objects (both successful and failed)
@@ -228,7 +233,13 @@ class Orchestrator:
                     # Signal start AFTER acquiring semaphore (actually running now)
                     if on_agent_start:
                         on_agent_start(agent.agent_id)
-                    result = await agent.reason(query.text)
+                    
+                    # Create token callback for this specific agent
+                    token_callback = None
+                    if on_agent_token:
+                        token_callback = lambda token: on_agent_token(agent.agent_id, token)
+                    
+                    result = await agent.reason(query.text, on_token=token_callback)
                 
                 if on_agent_complete:
                     error_msg = result.error if not result.success else None

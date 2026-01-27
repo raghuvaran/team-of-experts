@@ -270,9 +270,14 @@ class PartialFailureProvider(BaseProvider):
         temperature: float,
         max_tokens: int,
     ) -> AsyncIterator[str]:
+        current_call = self.call_count
         self.call_count += 1
         
-        response = "**Final Synthesized Answer**: Synthesis\n\n**Confidence Level**: Medium"
+        # Fail for specific agent IDs (same logic as invoke_model)
+        if current_call in self.fail_agent_ids:
+            raise RuntimeError(f"Simulated failure for agent {current_call}")
+        
+        response = f"Response from agent {current_call}\n\nFinal Answer: Answer {current_call}"
         for char in response:
             yield char
             await asyncio.sleep(0)

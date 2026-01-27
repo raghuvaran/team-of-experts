@@ -473,6 +473,14 @@ class TestErrorScenarios:
                 if self._call_count <= 3:
                     raise RuntimeError("Simulated failure")
                 return await super().invoke_model(*args, **kwargs)
+            
+            async def invoke_model_stream(self, *args, **kwargs):
+                self._call_count += 1
+                # Fail all but one agent (same logic as invoke_model)
+                if self._call_count <= 3:
+                    raise RuntimeError("Simulated failure")
+                async for token in super().invoke_model_stream(*args, **kwargs):
+                    yield token
         
         provider = FailingProvider()
         

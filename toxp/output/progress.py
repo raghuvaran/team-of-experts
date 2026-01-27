@@ -40,6 +40,7 @@ class AgentState:
     start_time: Optional[float] = None
     end_time: Optional[float] = None
     error: Optional[str] = None
+    stream_preview: str = ""  # Rolling preview of streamed content
     
     @property
     def duration(self) -> float:
@@ -78,6 +79,8 @@ class ProgressState:
 class TimelineProgress:
     """Rich-based timeline progress display with auto-refresh."""
     
+    PREVIEW_WIDTH = 50  # Max chars for stream preview
+    
     def __init__(self, total_agents: int, max_concurrency: Optional[int] = None):
         self.state = ProgressState(total=total_agents)
         self.max_concurrency = max_concurrency
@@ -94,22 +97,27 @@ class TimelineProgress:
         line = Text()
         line.append(f"  {icon} Agent {agent.agent_id:2d} ", style=style if agent.status != AgentStatus.RUNNING else "bold")
         
-        bar_width = 30
         if agent.status == AgentStatus.RUNNING:
-            # Animated pulse effect
-            pulse = int((agent.duration * 3) % (bar_width * 2))
-            pulse = bar_width * 2 - pulse if pulse > bar_width else pulse
-            line.append("━" * pulse + "░" * (bar_width - pulse), style="cyan")
-            line.append(f" {agent.duration:.1f}s", style="cyan bold")
+            # Show streaming preview instead of animated bar
+            line.append(f"{agent.duration:5.1f}s ", style="cyan bold")
+            if agent.stream_preview:
+                # Clean up preview: collapse whitespace, truncate
+                preview = " ".join(agent.stream_preview.split())
+                if len(preview) > self.PREVIEW_WIDTH:
+                    preview = "..." + preview[-(self.PREVIEW_WIDTH - 3):]
+                line.append(preview, style="dim italic")
+            else:
+                line.append("starting...", style="dim")
         elif agent.status.is_done:
             color = "green" if agent.status == AgentStatus.SUCCESS else "red"
-            line.append("━" * bar_width, style=f"{color} dim")
-            line.append(f" {agent.duration:.1f}s", style=color)
+            line.append(f"{agent.duration:5.1f}s ", style=color)
             if agent.error:
-                err = agent.error[:40] + "..." if len(agent.error) > 40 else agent.error
-                line.append(f"\n      └─ {err}", style="red dim")
+                err = agent.error[:50] + "..." if len(agent.error) > 50 else agent.error
+                line.append(err, style="red dim")
+            else:
+                line.append("done", style=f"{color} dim")
         else:  # PENDING
-            line.append("░" * bar_width + " waiting", style="dim")
+            line.append("      waiting", style="dim")
         
         return line
     
@@ -168,8 +176,24 @@ class TimelineProgress:
             a.end_time = time.time()
             a.error = error
     
-    def get_callbacks(self) -> tuple[Callable[[int], None], Callable[[int, bool, Optional[str]], None]]:
-        return self.agent_started, self.agent_completed
+    def agent_token(self, agent_id: int, token: str) -> None:
+        """Update streaming preview for an agent."""
+        if agent_id in self.state.agents:
+            a = self.state.agents[agent_id]
+            # Append token and keep last N chars
+            a.stream_preview += token
+            if len(a.stream_preview) > self.PREVIEW_WIDTH * 2:
+                a.stream_preview = a.stream_preview[-self.PREVIEW_WIDTH:]
+    
+    def get_callbacks(
+        self,
+    ) -> tuple[
+        Callable[[int], None],
+        Callable[[int, bool, Optional[str]], None],
+        Callable[[int, str], None],
+    ]:
+        """Return callbacks for agent start, complete, and token events."""
+        return self.agent_started, self.agent_completed, self.agent_token
 
 
 def create_progress_display(

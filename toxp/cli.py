@@ -322,8 +322,9 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
         # Get progress callbacks if display is active
         on_agent_start = None
         on_agent_complete = None
+        on_agent_token = None
         if progress:
-            on_agent_start, on_agent_complete = progress.get_callbacks()
+            on_agent_start, on_agent_complete, on_agent_token = progress.get_callbacks()
             progress.start()
         
         try:
@@ -333,6 +334,7 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
                 on_agent_start=on_agent_start,
                 on_agent_complete=on_agent_complete,
                 on_agents_done=on_agents_done,
+                on_agent_token=on_agent_token,
             )
         finally:
             # Ensure progress is stopped even on error

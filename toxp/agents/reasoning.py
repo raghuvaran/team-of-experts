@@ -3,7 +3,7 @@
 import logging
 import re
 import time
-from typing import Optional, Tuple
+from typing import Callable, Optional, Tuple
 
 from toxp.models.response import AgentResponse
 from toxp.providers.base import BaseProvider
@@ -42,17 +42,23 @@ class ReasoningAgent:
         self.temperature = temperature
         self.max_tokens = max_tokens
 
-    async def reason(self, query: str) -> AgentResponse:
+    async def reason(
+        self,
+        query: str,
+        on_token: Optional[Callable[[str], None]] = None,
+    ) -> AgentResponse:
         """
-        Execute reasoning on the given query.
+        Execute reasoning on the given query using streaming.
         
         This method:
-        1. Invokes the provider with the reasoning system prompt
-        2. Parses the response to extract chain-of-thought and final answer
-        3. Handles errors gracefully without blocking other agents
+        1. Invokes the provider with streaming to avoid timeout issues
+        2. Optionally calls on_token callback for each streamed token
+        3. Parses the response to extract chain-of-thought and final answer
+        4. Handles errors gracefully without blocking other agents
         
         Args:
             query: The user's question or problem to solve
+            on_token: Optional callback invoked with each streamed token
             
         Returns:
             AgentResponse with reasoning results or error information
@@ -60,25 +66,30 @@ class ReasoningAgent:
         start_time = time.time()
         
         try:
-            logger.info(f"Agent {self.agent_id}: Starting reasoning")
+            logger.info(f"Agent {self.agent_id}: Starting reasoning (streaming)")
             
-            # Invoke provider with reasoning prompt
-            response = await self.provider.invoke_model(
+            # Use streaming to avoid timeout issues with large prompts
+            response_text = ""
+            async for token in self.provider.invoke_model_stream(
                 system_prompt=REASONING_AGENT_SYSTEM_PROMPT,
                 user_message=query,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
-            )
+            ):
+                response_text += token
+                if on_token:
+                    on_token(token)
             
             # Extract chain-of-thought and final answer
-            chain_of_thought, final_answer = self._parse_response(response.text)
+            chain_of_thought, final_answer = self._parse_response(response_text)
             
             duration = time.time() - start_time
-            token_count = response.input_tokens + response.output_tokens
+            # Estimate token count from response length (streaming doesn't provide exact count)
+            estimated_tokens = len(response_text) // 4
             
             logger.info(
                 f"Agent {self.agent_id}: Completed successfully "
-                f"({duration:.2f}s, {token_count} tokens)"
+                f"({duration:.2f}s, ~{estimated_tokens} tokens)"
             )
             
             return AgentResponse(
@@ -88,7 +99,7 @@ class ReasoningAgent:
                 final_answer=final_answer,
                 error=None,
                 duration_seconds=duration,
-                token_count=token_count,
+                token_count=estimated_tokens,
             )
             
         except TimeoutError as e:
