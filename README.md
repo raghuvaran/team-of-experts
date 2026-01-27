@@ -31,6 +31,14 @@ pipx install toxp       # alternative
 pip install toxp        # in current env
 ```
 
+## Upgrading
+
+```bash
+uv tool upgrade toxp    # if installed with uv
+pipx upgrade toxp       # if installed with pipx
+pip install -U toxp     # if installed with pip
+```
+
 ## Setup
 
 ```bash
