@@ -34,6 +34,10 @@ class QuotaInfo:
 # Default quotas for Claude models (conservative estimates)
 # These are used when we can't query Service Quotas API
 DEFAULT_QUOTAS = {
+    # Global cross-region Opus 4.6
+    "global.anthropic.claude-opus-4-6": QuotaInfo(250, 500_000, "opus-4.6"),
+    # Cross-region Opus 4.6
+    "anthropic.claude-opus-4-6": QuotaInfo(125, 250_000, "opus-4.6"),
     # Global cross-region Opus 4.5
     "global.anthropic.claude-opus-4-5": QuotaInfo(250, 500_000, "opus-4.5"),
     # Cross-region Opus 4.5

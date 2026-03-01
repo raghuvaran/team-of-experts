@@ -75,7 +75,7 @@ class BedrockProvider(BaseProvider):
 
     # Valid Claude model ID patterns
     # Format: anthropic.claude-{variant}-{version} OR {region}.anthropic.claude-{variant}-{version}
-    MODEL_ID_PATTERN = re.compile(r"^(us\.|eu\.|ap\.|global\.)?anthropic\.claude-[a-z0-9\-:]+$")
+    MODEL_ID_PATTERN = re.compile(r"^(us\.|eu\.|ap\.|jp\.|apac\.|global\.)?anthropic\.claude-[a-z0-9\-:]+$")
 
     def __init__(
         self,
@@ -84,6 +84,7 @@ class BedrockProvider(BaseProvider):
         aws_profile: str = "default",
         timeout_seconds: int = 120,
         max_retries: int = 3,
+        context_1m: bool = False,
     ):
         """Initialize Bedrock provider.
         
@@ -93,6 +94,7 @@ class BedrockProvider(BaseProvider):
             aws_profile: AWS credentials profile name (default: default)
             timeout_seconds: Timeout for API calls (default: 120)
             max_retries: Maximum retry attempts for throttling (default: 3)
+            context_1m: Enable 1M token context window beta (default: False)
             
         Raises:
             CredentialsError: If AWS credentials are not configured
@@ -103,6 +105,7 @@ class BedrockProvider(BaseProvider):
         self.aws_profile = aws_profile
         self.timeout_seconds = timeout_seconds
         self.max_retries = max_retries
+        self.context_1m = context_1m
         
         # Validate model ID format
         self.validate_model_id(model_id)
@@ -149,6 +152,12 @@ class BedrockProvider(BaseProvider):
     def model_id(self) -> str:
         """Return the model ID being used."""
         return self._model_id
+
+    def _additional_request_fields(self) -> dict:
+        """Build additionalModelRequestFields for Converse API."""
+        if self.context_1m:
+            return {"anthropic_beta": ["context-1m-2025-08-07"]}
+        return {}
 
     @classmethod
     def validate_model_id(cls, model_id: str) -> bool:
@@ -246,6 +255,9 @@ class BedrockProvider(BaseProvider):
                             messages=messages,
                             system=system_prompts,
                             inferenceConfig=inference_config,
+                            **({
+                                "additionalModelRequestFields": self._additional_request_fields()
+                            } if self.context_1m else {}),
                         ),
                     ),
                     timeout=self.timeout_seconds,
@@ -379,6 +391,9 @@ class BedrockProvider(BaseProvider):
                     messages=messages,
                     system=system_prompts,
                     inferenceConfig=inference_config,
+                    **({
+                        "additionalModelRequestFields": self._additional_request_fields()
+                    } if self.context_1m else {}),
                 )
                 for event in response.get("stream", []):
                     if "contentBlockDelta" in event:

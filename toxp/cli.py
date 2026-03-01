@@ -93,6 +93,8 @@ def _add_query_flags(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("-c", "--max-concurrency", type=int, metavar="N",
                         help="Maximum concurrent API requests "
                         "(default: auto-calculated based on model quotas)")
+    parser.add_argument("--context-1m", action="store_true", default=None,
+                        help="Enable 1M token context window beta")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -305,6 +307,7 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
             "aws_profile": getattr(args, "aws_profile", None),
             "region": getattr(args, "region", None),
             "max_concurrency": getattr(args, "max_concurrency", None),
+            "context_1m": getattr(args, "context_1m", None),
         }.items() if v is not None
     }
 

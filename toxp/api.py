@@ -193,6 +193,7 @@ async def run_query(
         region=config.region,
         aws_profile=config.aws_profile,
         model_id=config.model,
+        context_1m=config.context_1m,
     )
 
     # 3. Create orchestrator

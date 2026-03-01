@@ -28,6 +28,7 @@ VALID_CONFIG_KEYS = (
     "coordinator_temperature",
     "max_tokens",
     "max_concurrency",
+    "context_1m",
     "log_enabled",
     "log_retention_days",
 )
@@ -39,6 +40,7 @@ CLI_KEY_MAP = {
     "coordinator-temperature": "coordinator_temperature",
     "max-tokens": "max_tokens",
     "max-concurrency": "max_concurrency",
+    "context-1m": "context_1m",
     "log-enabled": "log_enabled",
     "log-retention-days": "log_retention_days",
 }
@@ -98,6 +100,10 @@ class ToxpConfig(BaseModel):
         ge=1,
         le=32,
         description="Maximum concurrent API requests (None = auto-calculate based on model quotas)",
+    )
+    context_1m: bool = Field(
+        default=False,
+        description="Enable 1M token context window beta (Bedrock only)",
     )
     log_enabled: bool = Field(
         default=True,

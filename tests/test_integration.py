@@ -234,7 +234,8 @@ class TestConfigCommandFlow:
         expected_keys = {
             "provider", "aws_profile", "region", "model", "num_agents",
             "temperature", "coordinator_temperature", "max_tokens",
-            "log_enabled", "log_retention_days", "max_concurrency"
+            "log_enabled", "log_retention_days", "max_concurrency",
+            "context_1m"
         }
         assert set(config.keys()) == expected_keys
         
