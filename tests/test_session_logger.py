@@ -588,3 +588,21 @@ class TestLogRetentionCleanup:
             deleted_count = logger._cleanup_old_logs()
             
             assert deleted_count == num_old
+
+
+class TestOpus46Pricing:
+    """Tests for Opus 4.6 pricing estimates."""
+
+    def test_opus_46_uses_specific_pricing(self) -> None:
+        """Opus 4.6 model IDs use the opus-4-6 rate, not generic opus."""
+        logger = SessionLogger(enabled=False)
+        cost_46 = logger._estimate_cost(1_000_000, "global.anthropic.claude-opus-4-6-v1")
+        cost_generic = logger._estimate_cost(1_000_000, "global.anthropic.claude-opus-4-5-v1:0")
+        # Opus 4.6 ($15/MTok) should be cheaper than generic opus ($45/MTok)
+        assert cost_46 < cost_generic
+
+    def test_opus_46_pricing_value(self) -> None:
+        """Opus 4.6 cost estimate matches expected ~$15/MTok blended rate."""
+        logger = SessionLogger(enabled=False)
+        cost = logger._estimate_cost(1_000_000, "anthropic.claude-opus-4-6-v1")
+        assert cost == pytest.approx(15.0, rel=0.01)

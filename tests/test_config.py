@@ -501,3 +501,25 @@ class TestConfigReset:
                         os.environ.pop(k, None)
                     else:
                         os.environ[k] = v
+
+
+class TestContext1mConfig:
+    """Tests for context_1m configuration field."""
+
+    @given(context_1m=st.booleans())
+    @settings(max_examples=20)
+    def test_context_1m_round_trip(self, context_1m: bool) -> None:
+        """context-1m value round-trips through set/get."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir)
+            manager = ConfigManager(config_dir=config_dir, config_file=config_dir / "config.json")
+
+            manager.set("context-1m", str(context_1m).lower())
+            retrieved = manager.get("context-1m")
+
+            assert retrieved == context_1m
+
+    def test_context_1m_default_is_false(self) -> None:
+        """context_1m defaults to False."""
+        config = ToxpConfig.get_defaults()
+        assert config.context_1m is False

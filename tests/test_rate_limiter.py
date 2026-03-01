@@ -19,6 +19,8 @@ valid_model_ids = st.sampled_from([
     "anthropic.claude-3-haiku-20240307-v1:0",
     "global.anthropic.claude-opus-4-5-20250929-v1:0",
     "anthropic.claude-opus-4-5-20250929-v1:0",
+    "global.anthropic.claude-opus-4-6-v1",
+    "anthropic.claude-opus-4-6-v1",
 ])
 
 # Strategy for generating concurrency values
@@ -260,3 +262,18 @@ class TestQuotaCalculation:
         )
         
         assert limiter.max_concurrency <= 10
+
+
+class TestOpus46Quota:
+    """Tests for Opus 4.6 quota entries."""
+
+    @pytest.mark.parametrize("model_id,expected_id", [
+        ("global.anthropic.claude-opus-4-6-v1", "opus-4.6"),
+        ("anthropic.claude-opus-4-6-v1", "opus-4.6"),
+    ])
+    def test_opus_46_quota_lookup(self, model_id: str, expected_id: str) -> None:
+        """Opus 4.6 model IDs resolve to the correct quota entry."""
+        quota = get_quota_for_model(model_id)
+        assert quota.model_id == expected_id
+        assert quota.requests_per_minute > 0
+        assert quota.tokens_per_minute > 0

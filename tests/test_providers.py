@@ -468,6 +468,9 @@ valid_claude_model_ids = st.sampled_from([
     "eu.anthropic.claude-3-sonnet-20240229-v1:0",
     "ap.anthropic.claude-3-haiku-20240307-v1:0",
     "global.anthropic.claude-3-opus-20240229-v1:0",
+    "global.anthropic.claude-opus-4-6-v1",
+    "jp.anthropic.claude-opus-4-6-v1",
+    "apac.anthropic.claude-opus-4-6-v1",
 ])
 
 # Strategy for generating invalid model IDs
@@ -582,3 +585,32 @@ class TestModelIdValidation:
         # Should pass validation (pattern matches)
         result = BedrockProvider.is_valid_model_id(model_id)
         assert result is True
+
+
+class TestContext1mBetaHeader:
+    """Tests for 1M context window beta header support."""
+
+    def test_additional_fields_empty_when_disabled(self) -> None:
+        """context_1m=False produces no additional request fields."""
+        provider = BedrockProvider.__new__(BedrockProvider)
+        provider.context_1m = False
+        assert provider._additional_request_fields() == {}
+
+    def test_additional_fields_has_beta_header_when_enabled(self) -> None:
+        """context_1m=True produces the correct anthropic_beta header."""
+        provider = BedrockProvider.__new__(BedrockProvider)
+        provider.context_1m = True
+        fields = provider._additional_request_fields()
+        assert fields == {"anthropic_beta": ["context-1m-2025-08-07"]}
+
+    @pytest.mark.parametrize("model_id", [
+        "global.anthropic.claude-opus-4-6-v1",
+        "us.anthropic.claude-opus-4-6-v1",
+        "eu.anthropic.claude-opus-4-6-v1",
+        "jp.anthropic.claude-opus-4-6-v1",
+        "apac.anthropic.claude-opus-4-6-v1",
+        "anthropic.claude-opus-4-6-v1",
+    ])
+    def test_opus_46_model_ids_pass_validation(self, model_id: str) -> None:
+        """All Opus 4.6 model ID variants pass validation."""
+        assert BedrockProvider.is_valid_model_id(model_id) is True
