@@ -64,7 +64,7 @@ Before pushing commits, run the full test suite including live Bedrock smoke tes
 2. Read the configured AWS profile: `toxp config get aws-profile`
 3. Run live smoke tests: `TOXP_LIVE_PROFILE=<profile> pytest -m live -v`
 
-If live tests fail due to expired credentials, note it in the commit message but don't block the push.
+If live tests fail due to expired credentials, **do not push**. Ask the user to refresh credentials first.
 
 ## PR Workflow
 
