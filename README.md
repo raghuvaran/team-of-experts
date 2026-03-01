@@ -1,6 +1,6 @@
 # TOXP - Team Of eXPerts
 
-Parallel reasoning CLI using multiple LLM agents. TOXP spawns N independent reasoning agents to tackle complex queries, then synthesizes their outputs through a coordinator agent into a coherent, high-confidence answer.
+Parallel reasoning CLI and Python library using multiple LLM agents. TOXP spawns N independent reasoning agents to tackle complex queries, then synthesizes their outputs through a coordinator agent into a coherent, high-confidence answer.
 
 ## Features
 
@@ -9,6 +9,8 @@ Parallel reasoning CLI using multiple LLM agents. TOXP spawns N independent reas
 - **Confidence Levels**: Low/Medium/High confidence ratings
 - **Streaming Output**: Real-time coordinator synthesis
 - **Session Logging**: Markdown logs with token counts and cost estimates
+- **Python API**: Use `run_query()` directly from your own code
+- **1M Context**: Optional 1M token context window for supported models (Opus 4.6)
 
 ## Prerequisites
 
@@ -54,6 +56,28 @@ echo "Explain recursion" | toxp
 toxp -v "Analyze quicksort"        # verbose
 toxp --quiet "What is 2 + 2?"      # only answer
 toxp --output answer.txt "Question"
+toxp --context-1m "Summarize this very long document..."
+```
+
+## Python API
+
+```python
+from toxp import run_query, QueryResult, validate_credentials
+
+# Simple usage
+result = await run_query("What is 2+2?")
+print(result.final_answer, result.confidence)
+
+# With overrides and callbacks
+result = await run_query(
+    "Explain recursion",
+    config_overrides={"num_agents": 8, "temperature": 0.7},
+    callbacks=MyCallbacks(),
+    cancel_token=my_cancel_event,
+)
+
+# Check credentials before running
+validate_credentials()
 ```
 
 ## Configuration
@@ -73,7 +97,13 @@ toxp config reset                   # reset defaults
 | `region` | `us-east-1` | AWS region |
 | `num-agents` | `15` | Parallel agents (2-32) |
 | `temperature` | `0.9` | Agent temperature |
-| `model` | `claude-sonnet-4-5` | Model ID |
+| `coordinator-temperature` | `0.7` | Coordinator temperature |
+| `model` | `claude-sonnet-4-5` | Model ID (supports Opus 4.6) |
+| `max-tokens` | `8192` | Max tokens per response |
+| `max-concurrency` | `auto` | Max concurrent API requests |
+| `context-1m` | `false` | Enable 1M token context window beta |
+| `log-enabled` | `true` | Enable session logging |
+| `log-retention-days` | `30` | Days to keep logs |
 
 Environment variables: `TOXP_AWS_PROFILE`, `TOXP_REGION`, `TOXP_NUM_AGENTS`
 
@@ -83,11 +113,13 @@ Environment variables: `TOXP_AWS_PROFILE`, `TOXP_REGION`, `TOXP_NUM_AGENTS`
 toxp [OPTIONS] [QUERY]
 
 Options:
-  -q, --query TEXT       Query string
-  -n, --num-agents INT   Agents (2-32)
+  -q, --query TEXT         Query string
+  -n, --num-agents INT     Agents (2-32)
   -t, --temperature FLOAT
+  -c, --max-concurrency N  Max concurrent API requests
   --aws-profile TEXT
   --region TEXT
+  --context-1m             Enable 1M token context window beta
   -o, --output FILE
   -v, --verbose
   --quiet
