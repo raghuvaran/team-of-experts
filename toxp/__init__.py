@@ -1,11 +1,17 @@
-"""TOXP CLI - Team of eXPerts parallel reasoning system."""
+"""TOXP — Team of eXPerts parallel reasoning system.
+
+Library usage:
+    from toxp import run_query, QueryResult, QueryCallbacks, validate_credentials
+
+    result = await run_query("What is 2+2?")
+    print(result.final_answer, result.confidence)
+"""
 
 import sys
 
-__version__ = "0.4.1"
-__all__ = ["__version__"]
+__version__ = "0.5.0"
 
-# Runtime Python version check - catches cases where wrong package was installed
+# Runtime Python version check
 MIN_PYTHON = (3, 10)
 if sys.version_info < MIN_PYTHON:
     sys.exit(
@@ -15,3 +21,47 @@ if sys.version_info < MIN_PYTHON:
         f"  uvx --python 3.12 --from team-of-experts txp \"your question\"\n\n"
         f"Or install Python 3.10+ and reinstall TOXP."
     )
+
+# Public API
+from toxp.api import (
+    run_query,
+    QueryResult,
+    QueryCallbacks,
+    NoOpCallbacks,
+    validate_credentials,
+    get_default_config,
+)
+
+# Exceptions (already well-structured)
+from toxp.exceptions import (
+    ToxpError,
+    CredentialsError,
+    ConfigurationError,
+    ProviderError,
+    ModelNotFoundError,
+    ThrottlingError,
+    InsufficientAgentsError,
+    NetworkError,
+    TimeoutError,
+)
+
+__all__ = [
+    "__version__",
+    # API
+    "run_query",
+    "QueryResult",
+    "QueryCallbacks",
+    "NoOpCallbacks",
+    "validate_credentials",
+    "get_default_config",
+    # Exceptions
+    "ToxpError",
+    "CredentialsError",
+    "ConfigurationError",
+    "ProviderError",
+    "ModelNotFoundError",
+    "ThrottlingError",
+    "InsufficientAgentsError",
+    "NetworkError",
+    "TimeoutError",
+]

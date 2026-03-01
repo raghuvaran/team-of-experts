@@ -107,15 +107,16 @@ class Orchestrator:
         on_agent_complete: Optional[Callable[[int, bool, Optional[str]], None]] = None,
         on_agents_done: Optional[Callable[[], None]] = None,
         on_agent_token: Optional[Callable[[int, str], None]] = None,
+        cancel_token: Optional[asyncio.Event] = None,
     ) -> Result:
         """Process a query through the full TOXP pipeline.
-        
+
         This is the main entry point for query processing. It:
         1. Spawns N reasoning agents concurrently
         2. Validates success rate (≥50%)
         3. Invokes coordinator for synthesis
         4. Returns complete result with metadata
-        
+
         Args:
             query: The user query to process
             on_coordinator_token: Optional callback for streaming coordinator output
@@ -123,45 +124,53 @@ class Orchestrator:
             on_agent_complete: Optional callback when agent completes (agent_id, success, error)
             on_agents_done: Optional callback when all agents finish (before coordinator)
             on_agent_token: Optional callback for agent streaming tokens (agent_id, token)
-            
+            cancel_token: Optional asyncio.Event for cooperative cancellation. When set,
+                the orchestrator stops spawning new agents and cancels in-flight work.
+
         Returns:
             Result containing all agent responses and coordinator synthesis
-            
+
         Raises:
             InsufficientAgentsError: If fewer than 50% of agents succeed
+            asyncio.CancelledError: If cancel_token was set during execution
         """
         start_time = time.time()
-        
+
         logger.info(
             f"Processing query '{query.query_id}': "
             f"spawning {self.num_agents} agents"
         )
-        
+
         # Step 1: Spawn reasoning agents concurrently
         agent_responses = await self._spawn_agents(
             query,
             on_agent_start=on_agent_start,
             on_agent_complete=on_agent_complete,
             on_agent_token=on_agent_token,
+            cancel_token=cancel_token,
         )
-        
+
+        # Check cancellation after agents complete
+        if cancel_token and cancel_token.is_set():
+            raise asyncio.CancelledError("Query cancelled by cancel_token")
+
         # Signal that all agents are done (before coordinator starts)
         if on_agents_done:
             on_agents_done()
-        
+
         # Step 2: Validate success rate
         if not self._validate_responses(agent_responses):
             successful = [r for r in agent_responses if r.success]
             failed = [r for r in agent_responses if not r.success]
             min_required = int(len(agent_responses) * self.min_success_rate)
-            
+
             raise InsufficientAgentsError(
                 successful_count=len(successful),
                 total_count=len(agent_responses),
                 min_required=min_required,
                 agent_errors=[r.error for r in failed if r.error],
             )
-        
+
         # Step 3: Invoke coordinator for synthesis
         try:
             coordinator_response = await self._synthesize(
@@ -173,10 +182,10 @@ class Orchestrator:
             coordinator_response = self._create_fallback_response(
                 agent_responses, str(e)
             )
-        
+
         # Step 4: Build and return result
         total_duration = time.time() - start_time
-        
+
         result = Result(
             query=query,
             agent_responses=agent_responses,
@@ -185,13 +194,13 @@ class Orchestrator:
                 agent_responses, coordinator_response, total_duration
             ),
         )
-        
+
         logger.info(
             f"Query '{query.query_id}' completed in {total_duration:.2f}s: "
             f"{len([r for r in agent_responses if r.success])}/{len(agent_responses)} "
             f"agents succeeded, confidence={coordinator_response.confidence}"
         )
-        
+
         return result
 
     async def _spawn_agents(
@@ -200,18 +209,20 @@ class Orchestrator:
         on_agent_start: Optional[Callable[[int], None]] = None,
         on_agent_complete: Optional[Callable[[int, bool, Optional[str]], None]] = None,
         on_agent_token: Optional[Callable[[int, str], None]] = None,
+        cancel_token: Optional[asyncio.Event] = None,
     ) -> List[AgentResponse]:
         """Spawn reasoning agents with rate-limited concurrency.
-        
+
         Creates N reasoning agents and executes them concurrently, using
         the rate limiter to prevent API throttling.
-        
+
         Args:
             query: The query for agents to process
             on_agent_start: Optional callback when agent starts
             on_agent_complete: Optional callback when agent completes
             on_agent_token: Optional callback for streaming tokens (agent_id, token)
-            
+            cancel_token: Optional asyncio.Event for cooperative cancellation
+
         Returns:
             List of AgentResponse objects (both successful and failed)
         """
@@ -225,43 +236,69 @@ class Orchestrator:
             )
             for i in range(self.num_agents)
         ]
-        
+
         async def run_with_rate_limit(agent: ReasoningAgent) -> AgentResponse:
             """Execute agent with rate limiting and progress callbacks."""
+            # Check cancellation before acquiring semaphore
+            if cancel_token and cancel_token.is_set():
+                return AgentResponse(
+                    agent_id=agent.agent_id,
+                    success=False,
+                    chain_of_thought="",
+                    final_answer="",
+                    error="Cancelled",
+                    duration_seconds=0.0,
+                    token_count=0,
+                )
+
             try:
                 async with self.rate_limiter:
+                    # Check cancellation after acquiring semaphore
+                    if cancel_token and cancel_token.is_set():
+                        return AgentResponse(
+                            agent_id=agent.agent_id,
+                            success=False,
+                            chain_of_thought="",
+                            final_answer="",
+                            error="Cancelled",
+                            duration_seconds=0.0,
+                            token_count=0,
+                        )
+
                     # Signal start AFTER acquiring semaphore (actually running now)
                     if on_agent_start:
                         on_agent_start(agent.agent_id)
-                    
+
                     # Create token callback for this specific agent
                     # Use default arg to capture agent_id by value, not reference
                     token_callback = None
                     if on_agent_token:
                         agent_id = agent.agent_id  # Capture by value
-                        token_callback = lambda token, aid=agent_id: on_agent_token(aid, token)
-                    
+                        token_callback = lambda token, aid=agent_id: on_agent_token(
+                            aid, token
+                        )
+
                     result = await agent.reason(query.text, on_token=token_callback)
-                
+
                 if on_agent_complete:
                     error_msg = result.error if not result.success else None
                     on_agent_complete(agent.agent_id, result.success, error_msg)
-                
+
                 return result
             except Exception as e:
                 if on_agent_complete:
                     on_agent_complete(agent.agent_id, False, str(e))
                 raise
-        
+
         logger.debug(f"Spawning {len(agents)} agents with rate limiting")
-        
+
         # Execute all agents concurrently with rate limiting
         # return_exceptions=True ensures we get all results even if some fail
         results = await asyncio.gather(
             *[run_with_rate_limit(agent) for agent in agents],
             return_exceptions=True,
         )
-        
+
         # Convert any exceptions to failed AgentResponses
         agent_responses: List[AgentResponse] = []
         for i, result in enumerate(results):
@@ -280,10 +317,12 @@ class Orchestrator:
                 )
             else:
                 agent_responses.append(result)
-        
+
         successful = len([r for r in agent_responses if r.success])
-        logger.info(f"Agent execution complete: {successful}/{len(agent_responses)} succeeded")
-        
+        logger.info(
+            f"Agent execution complete: {successful}/{len(agent_responses)} succeeded"
+        )
+
         return agent_responses
 
     def _validate_responses(self, agent_responses: List[AgentResponse]) -> bool:

@@ -217,16 +217,29 @@ class ConfigManager:
         return overrides
 
     def _parse_env_value(self, key: str, value: str) -> Any:
-        """Parse environment variable value to appropriate type."""
-        # Get the field type from ToxpConfig
-        defaults = ToxpConfig.get_defaults()
-        default_value = getattr(defaults, key)
-        
-        if isinstance(default_value, bool):
+        """Parse environment variable value to appropriate type.
+
+        Uses ToxpConfig field annotations to determine the target type,
+        rather than inspecting the default value. This correctly handles
+        fields like max_concurrency whose default is None but whose
+        actual type is Optional[int].
+        """
+        field_info = ToxpConfig.model_fields.get(key)
+        if field_info is None:
+            return value
+
+        annotation = field_info.annotation
+        # Unwrap Optional[X] → X (Optional[int] is Union[int, None])
+        origin = getattr(annotation, "__origin__", None)
+        if origin is Union:
+            args = [a for a in annotation.__args__ if a is not type(None)]
+            annotation = args[0] if args else str
+
+        if annotation is bool:
             return value.lower() in ("true", "1", "yes", "on")
-        elif isinstance(default_value, int):
+        elif annotation is int:
             return int(value)
-        elif isinstance(default_value, float):
+        elif annotation is float:
             return float(value)
         return value
 
@@ -367,6 +380,24 @@ class ConfigManager:
                     config_data[normalized_key] = value
         
         return ToxpConfig.from_dict(config_data)
+    def load_with_overrides(
+        self, overrides: Optional[Dict[str, Any]] = None
+    ) -> ToxpConfig:
+        """Load config and apply overrides in one call. Does not mutate the file.
+
+        This is the preferred method for programmatic consumers that need
+        per-query config without affecting the user's saved settings.
+
+        Args:
+            overrides: Optional dict of config keys to override.
+
+        Returns:
+            ToxpConfig with overrides applied.
+        """
+        config = self.load()
+        if overrides:
+            config = self.apply_overrides(config, overrides)
+        return config
 
     def get_valid_keys(self) -> List[str]:
         """Get list of valid configuration keys in CLI format (kebab-case)."""
