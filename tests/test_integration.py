@@ -14,7 +14,7 @@ import sys
 import tempfile
 from pathlib import Path
 from typing import AsyncIterator, List, Optional
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock, AsyncMock
 
 import pytest
 
@@ -661,6 +661,16 @@ class TestCLIArgumentParsing:
         assert args.command == "config"
         assert args.config_action == "path"
 
+    def test_context_1m_flag(self):
+        """Test --context-1m flag is parsed correctly."""
+        args, _ = parse_args(["--context-1m", "test query"])
+        assert args.context_1m is True
+
+    def test_context_1m_flag_absent_is_none(self):
+        """Test --context-1m absent gives None (not False), so it doesn't override config."""
+        args, _ = parse_args(["test query"])
+        assert args.context_1m is None
+
 
 # =============================================================================
 # Output Formatter Integration Tests
@@ -1094,3 +1104,233 @@ class TestStdinPiping:
         
         # stdin should be used as fallback
         assert query == "stdin query"
+
+
+# =============================================================================
+# handle_query_command Integration Tests
+# =============================================================================
+
+def _make_args(**overrides):
+    """Build a minimal argparse.Namespace for handle_query_command."""
+    import argparse
+    defaults = dict(
+        query_flag=None, output_file=None, verbose=False, quiet=False,
+        no_log=True, num_agents=None, model=None, temperature=None,
+        aws_profile=None, region=None, max_concurrency=None, context_1m=None,
+        command=None,
+    )
+    defaults.update(overrides)
+    return argparse.Namespace(**defaults)
+
+
+def _make_query_result():
+    """Build a minimal QueryResult-compatible mock."""
+    from toxp.api import QueryResult
+    result = Result(
+        query=Query(text="test"),
+        agent_responses=[
+            AgentResponse(
+                agent_id=0, success=True, chain_of_thought="t",
+                final_answer="42", duration_seconds=0.1, token_count=10,
+            ),
+        ],
+        coordinator_response=CoordinatorResponse(
+            synthesis="s", confidence="High", final_answer="42",
+            duration_seconds=0.1,
+        ),
+        metadata={"model_id": "test-model"},
+    )
+    return QueryResult.from_result(result)
+
+
+class TestHandleQueryCommand:
+    """Integration tests for handle_query_command."""
+
+    def test_returns_0_on_success(self, temp_config_dir):
+        """Successful query returns exit code 0."""
+        args = _make_args(query_flag="What is 2+2?")
+        formatter = OutputFormatter(quiet=True, stdout=io.StringIO(), stderr=io.StringIO(), use_color=False)
+
+        qr = _make_query_result()
+        with patch("toxp.api.run_query", new_callable=AsyncMock, return_value=qr):
+            with patch("toxp.api.ConfigManager") as MockCM:
+                MockCM.return_value.load_with_overrides.return_value = ToxpConfig.get_defaults()
+                with patch("toxp.api.ProviderRegistry") as MockReg:
+                    MockReg.get.return_value = lambda **kw: IntegrationMockProvider()
+                    exit_code = asyncio.run(handle_query_command(args, [], formatter))
+
+        assert exit_code == 0
+
+    def test_returns_1_when_no_query(self):
+        """Missing query returns exit code 1."""
+        args = _make_args()
+        stderr = io.StringIO()
+        formatter = OutputFormatter(quiet=False, stdout=io.StringIO(), stderr=stderr, use_color=False)
+
+        exit_code = asyncio.run(handle_query_command(args, [], formatter))
+        assert exit_code == 1
+        assert "No query" in stderr.getvalue()
+
+    def test_cli_overrides_passed_to_config(self, temp_config_dir):
+        """CLI flags are forwarded as config overrides."""
+        args = _make_args(query_flag="q", num_agents=5, temperature=0.3, context_1m=True)
+        formatter = OutputFormatter(quiet=True, stdout=io.StringIO(), stderr=io.StringIO(), use_color=False)
+
+        qr = _make_query_result()
+        with patch("toxp.api.run_query", new_callable=AsyncMock, return_value=qr) as mock_rq:
+            with patch("toxp.api.ConfigManager") as MockCM:
+                MockCM.return_value.load_with_overrides.return_value = ToxpConfig.get_defaults()
+                with patch("toxp.api.ProviderRegistry") as MockReg:
+                    MockReg.get.return_value = lambda **kw: IntegrationMockProvider()
+                    asyncio.run(handle_query_command(args, [], formatter))
+
+        # run_query is called with config_overrides containing our CLI values
+        call_kwargs = mock_rq.call_args
+        overrides = call_kwargs.kwargs.get("config_overrides") or call_kwargs[1].get("config_overrides")
+        assert overrides["num_agents"] == 5
+        assert overrides["temperature"] == 0.3
+        assert overrides["context_1m"] is True
+
+    def test_output_file_written(self, temp_config_dir):
+        """--output flag causes final answer to be written to file."""
+        out_path = temp_config_dir / "answer.txt"
+        args = _make_args(query_flag="q", output_file=str(out_path))
+        formatter = OutputFormatter(quiet=True, stdout=io.StringIO(), stderr=io.StringIO(), use_color=False)
+
+        qr = _make_query_result()
+        with patch("toxp.api.run_query", new_callable=AsyncMock, return_value=qr):
+            with patch("toxp.api.ConfigManager") as MockCM:
+                MockCM.return_value.load_with_overrides.return_value = ToxpConfig.get_defaults()
+                with patch("toxp.api.ProviderRegistry") as MockReg:
+                    MockReg.get.return_value = lambda **kw: IntegrationMockProvider()
+                    asyncio.run(handle_query_command(args, [], formatter))
+
+        assert out_path.exists()
+        assert "42" in out_path.read_text()
+
+    def test_credentials_error_returns_1(self):
+        """CredentialsError is caught and returns exit code 1."""
+        args = _make_args(query_flag="q")
+        stderr = io.StringIO()
+        formatter = OutputFormatter(quiet=False, stdout=io.StringIO(), stderr=stderr, use_color=False)
+
+        with patch("toxp.api.run_query", new_callable=AsyncMock, side_effect=CredentialsError("bad creds")):
+            with patch("toxp.api.ConfigManager") as MockCM:
+                MockCM.return_value.load_with_overrides.return_value = ToxpConfig.get_defaults()
+                with patch("toxp.api.ProviderRegistry") as MockReg:
+                    MockReg.get.return_value = lambda **kw: IntegrationMockProvider()
+                    exit_code = asyncio.run(handle_query_command(args, [], formatter))
+
+        assert exit_code == 1
+        assert "creds" in stderr.getvalue().lower()
+
+    def test_throttling_error_returns_1(self):
+        """ThrottlingError is caught and returns exit code 1."""
+        args = _make_args(query_flag="q")
+        stderr = io.StringIO()
+        formatter = OutputFormatter(quiet=False, stdout=io.StringIO(), stderr=stderr, use_color=False)
+
+        with patch("toxp.api.run_query", new_callable=AsyncMock, side_effect=ThrottlingError("throttled", retry_count=3)):
+            with patch("toxp.api.ConfigManager") as MockCM:
+                MockCM.return_value.load_with_overrides.return_value = ToxpConfig.get_defaults()
+                with patch("toxp.api.ProviderRegistry") as MockReg:
+                    MockReg.get.return_value = lambda **kw: IntegrationMockProvider()
+                    exit_code = asyncio.run(handle_query_command(args, [], formatter))
+
+        assert exit_code == 1
+
+
+# =============================================================================
+# context_1m Config-to-Provider Wiring Tests
+# =============================================================================
+
+class TestContext1mWiring:
+    """Tests that context_1m flows from config overrides to the provider."""
+
+    def test_context_1m_reaches_provider_constructor(self):
+        """context_1m=True in overrides is passed to provider_class(context_1m=True)."""
+        from toxp.api import run_query
+
+        captured_kwargs = {}
+
+        def fake_provider(**kwargs):
+            captured_kwargs.update(kwargs)
+            return IntegrationMockProvider()
+
+        config = ToxpConfig.from_dict(
+            {**ToxpConfig.get_defaults().to_dict(), "context_1m": True, "num_agents": 2}
+        )
+
+        with (
+            patch("toxp.api.ConfigManager") as MockCM,
+            patch("toxp.api.ProviderRegistry") as MockReg,
+        ):
+            MockCM.return_value.load_with_overrides.return_value = config
+            MockReg.get.return_value = fake_provider
+
+            asyncio.run(run_query("test", config_overrides={"context_1m": True}))
+
+        assert captured_kwargs.get("context_1m") is True
+
+    def test_context_1m_false_by_default(self):
+        """Without context_1m override, provider gets context_1m=False."""
+        from toxp.api import run_query
+
+        captured_kwargs = {}
+
+        def fake_provider(**kwargs):
+            captured_kwargs.update(kwargs)
+            return IntegrationMockProvider()
+
+        config = ToxpConfig.get_defaults()
+        config_dict = config.to_dict()
+        config_dict["num_agents"] = 2
+        config = ToxpConfig.from_dict(config_dict)
+
+        with (
+            patch("toxp.api.ConfigManager") as MockCM,
+            patch("toxp.api.ProviderRegistry") as MockReg,
+        ):
+            MockCM.return_value.load_with_overrides.return_value = config
+            MockReg.get.return_value = fake_provider
+
+            asyncio.run(run_query("test"))
+
+        assert captured_kwargs.get("context_1m") is False
+
+
+# =============================================================================
+# main() Dispatch Tests
+# =============================================================================
+
+class TestMainDispatch:
+    """Tests for the main() entry point."""
+
+    def test_help_flag_exits_0(self):
+        """--help exits with code 0."""
+        with patch("sys.argv", ["toxp", "--help"]):
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 0
+
+    def test_config_show_dispatches(self, temp_config_dir):
+        """main() dispatches 'config show' to handle_config_command."""
+        with patch("sys.argv", ["toxp", "config", "show"]):
+            with patch("toxp.cli.handle_config_command", return_value=0) as mock_hcc:
+                exit_code = main()
+
+        assert exit_code == 0
+        mock_hcc.assert_called_once()
+
+    def test_query_dispatches_to_handle_query(self):
+        """main() dispatches a query to handle_query_command via asyncio.run."""
+        qr = _make_query_result()
+        with patch("sys.argv", ["toxp", "test query"]):
+            with patch("toxp.api.run_query", new_callable=AsyncMock, return_value=qr):
+                with patch("toxp.api.ConfigManager") as MockCM:
+                    MockCM.return_value.load_with_overrides.return_value = ToxpConfig.get_defaults()
+                    with patch("toxp.api.ProviderRegistry") as MockReg:
+                        MockReg.get.return_value = lambda **kw: IntegrationMockProvider()
+                        exit_code = main()
+
+        assert exit_code == 0
