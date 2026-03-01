@@ -56,6 +56,16 @@ Commit messages use conventional commits:
 - `chore:` maintenance (version bumps, deps)
 - `docs:` documentation
 
+## Pre-Push Verification
+
+Before pushing commits, run the full test suite including live Bedrock smoke tests:
+
+1. Run unit/integration tests: `pytest -m "not live" -q`
+2. Read the configured AWS profile: `toxp config get aws-profile`
+3. Run live smoke tests: `TOXP_LIVE_PROFILE=<profile> pytest -m live -v`
+
+If live tests fail due to expired credentials, note it in the commit message but don't block the push.
+
 ## PR Workflow
 
 1. Create feature branch from main
