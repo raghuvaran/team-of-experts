@@ -1,5 +1,6 @@
 services:
   open-webui:
+    image: ghcr.io/raghuvaran/team-of-experts:latest
     build:
       context: ..
       dockerfile: ui/Dockerfile

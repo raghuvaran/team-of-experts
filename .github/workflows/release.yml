@@ -8,6 +8,7 @@ on:
 permissions:
   contents: write
   id-token: write  # Required for PyPI trusted publishing (OIDC)
+  packages: write  # Required for pushing Docker images to ghcr.io
 
 jobs:
   check-version:
@@ -26,10 +27,10 @@ jobs:
           CURRENT=$(grep -m1 'version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
           git show HEAD~1:pyproject.toml > /tmp/old_pyproject.toml 2>/dev/null || echo 'version = "0.0.0"' > /tmp/old_pyproject.toml
           PREVIOUS=$(grep -m1 'version = ' /tmp/old_pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-          
+
           echo "current=$CURRENT" >> $GITHUB_OUTPUT
           echo "previous=$PREVIOUS" >> $GITHUB_OUTPUT
-          
+
           if [ "$CURRENT" != "$PREVIOUS" ]; then
             echo "changed=true" >> $GITHUB_OUTPUT
             echo "Version changed: $PREVIOUS -> $CURRENT"
@@ -51,18 +52,18 @@ jobs:
         run: |
           VERSION=${{ needs.check-version.outputs.version }}
           PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
-          
+
           if [ -n "$PREV_TAG" ]; then
             COMMITS=$(git log ${PREV_TAG}..HEAD --pretty=format:"- %s" --no-merges | grep -v "chore: bump version" || echo "- Minor updates")
           else
             COMMITS=$(git log --pretty=format:"- %s" --no-merges -20 | grep -v "chore: bump version" || echo "- Initial release")
           fi
-          
+
           cat << EOF > release_notes.md
           ## What's Changed
-          
+
           $COMMITS
-          
+
           **Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREV_TAG:-initial}...${VERSION}
           EOF
 
@@ -115,3 +116,32 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+
+  build-docker:
+    needs: [check-version, create-release]
+    if: needs.check-version.outputs.changed == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ui/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ needs.check-version.outputs.version }}
+            ghcr.io/${{ github.repository }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

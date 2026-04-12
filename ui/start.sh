@@ -3,8 +3,8 @@
 # TOXP Web UI — one-command setup
 #
 # Usage:
-#   ./start.sh              # build + start + register pipe + open browser
-#   ./start.sh --rebuild    # force rebuild the image
+#   ./start.sh              # pull pre-built image + start + register pipe + open browser
+#   ./start.sh --rebuild    # force rebuild image from local source
 #   ./start.sh --stop       # stop the container
 #
 set -euo pipefail
@@ -81,7 +81,19 @@ else
 fi
 
 echo "[1/4] Starting container..."
-$COMPOSE_CMD up -d $BUILD_FLAG 2>&1 | grep -v "^$"
+if [ -n "$BUILD_FLAG" ]; then
+    echo "       Building from local source..."
+    $COMPOSE_CMD up -d --build 2>&1 | grep -v "^$"
+else
+    # Pull pre-built image; fall back to local build if pull fails
+    echo "       Pulling pre-built image..."
+    if $COMPOSE_CMD pull 2>/dev/null; then
+        $COMPOSE_CMD up -d 2>&1 | grep -v "^$"
+    else
+        echo "       Pre-built image not available — building locally..."
+        $COMPOSE_CMD up -d --build 2>&1 | grep -v "^$"
+    fi
+fi
 
 # --- Step 2: Wait for healthy ---
 echo "[2/4] Waiting for Open WebUI to be ready..."
