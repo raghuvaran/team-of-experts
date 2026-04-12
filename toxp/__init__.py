@@ -9,7 +9,7 @@ Library usage:
 
 import sys
 
-__version__ = "0.7.0"
+__version__ = "0.7.1"
 
 # Runtime Python version check
 MIN_PYTHON = (3, 10)
