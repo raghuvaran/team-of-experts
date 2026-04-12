@@ -10,7 +10,7 @@ import re
 import ssl
 import threading
 import time
-from typing import Any, AsyncIterator, Dict, Optional
+from typing import Any, AsyncIterator, Dict, List, Optional
 
 import boto3
 from botocore.config import Config as BotoConfig
@@ -23,6 +23,7 @@ from toxp.exceptions import (
     ThrottlingError,
     TimeoutError as ToxpTimeoutError,
 )
+from toxp.models.conversation import Message
 from .base import BaseProvider, ProviderResponse
 
 
@@ -201,24 +202,47 @@ class BedrockProvider(BaseProvider):
         except (ValueError, TypeError):
             return False
 
+    @staticmethod
+    def _build_bedrock_messages(
+        user_message: str,
+        messages: Optional[List[Message]] = None,
+    ) -> List[Dict[str, Any]]:
+        """Build Bedrock Converse API messages from either a single user_message or multi-turn messages.
+
+        Args:
+            user_message: Single user message (used when messages is None)
+            messages: Optional multi-turn conversation messages
+
+        Returns:
+            List of Bedrock-formatted message dicts
+        """
+        if messages:
+            return [
+                {"role": m["role"], "content": [{"text": m["content"]}]}
+                for m in messages
+            ]
+        return [{"role": "user", "content": [{"text": user_message}]}]
+
     async def invoke_model(
         self,
         system_prompt: str,
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages: Optional[List[Message]] = None,
     ) -> ProviderResponse:
         """Invoke Bedrock model using Converse API with retry logic.
-        
+
         Args:
             system_prompt: System prompt to set model behavior
-            user_message: User's input message
+            user_message: User's input message (used when messages is None)
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
-            
+            messages: Optional multi-turn conversation messages
+
         Returns:
             ProviderResponse containing model output and metrics
-            
+
         Raises:
             CredentialsError: If authentication fails
             ModelNotFoundError: If model is not found
@@ -226,12 +250,7 @@ class BedrockProvider(BaseProvider):
             BedrockProviderError: For other API errors
             TimeoutError: If invocation exceeds timeout
         """
-        messages = [
-            {
-                "role": "user",
-                "content": [{"text": user_message}],
-            }
-        ]
+        bedrock_messages = self._build_bedrock_messages(user_message, messages)
         
         system_prompts = [{"text": system_prompt}]
         
@@ -252,7 +271,7 @@ class BedrockProvider(BaseProvider):
                         None,
                         lambda: self.client.converse(
                             modelId=self._model_id,
-                            messages=messages,
+                            messages=bedrock_messages,
                             system=system_prompts,
                             inferenceConfig=inference_config,
                             **({
@@ -345,18 +364,20 @@ class BedrockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages: Optional[List[Message]] = None,
     ) -> AsyncIterator[str]:
         """Invoke Bedrock model with streaming response.
-        
+
         Args:
             system_prompt: System prompt to set model behavior
-            user_message: User's input message
+            user_message: User's input message (used when messages is None)
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
-            
+            messages: Optional multi-turn conversation messages
+
         Yields:
             String tokens as they are generated
-            
+
         Raises:
             CredentialsError: If authentication fails
             ModelNotFoundError: If model is not found
@@ -364,14 +385,9 @@ class BedrockProvider(BaseProvider):
         """
         import queue as queue_module
         from concurrent.futures import ThreadPoolExecutor
-        
-        messages = [
-            {
-                "role": "user",
-                "content": [{"text": user_message}],
-            }
-        ]
-        
+
+        bedrock_messages = self._build_bedrock_messages(user_message, messages)
+
         system_prompts = [{"text": system_prompt}]
         
         inference_config = {
@@ -388,7 +404,7 @@ class BedrockProvider(BaseProvider):
             try:
                 response = self.client.converse_stream(
                     modelId=self._model_id,
-                    messages=messages,
+                    messages=bedrock_messages,
                     system=system_prompts,
                     inferenceConfig=inference_config,
                     **({

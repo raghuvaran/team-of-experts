@@ -54,6 +54,7 @@ class MockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> ProviderResponse:
         self.call_count += 1
         if self.should_fail:
@@ -76,6 +77,7 @@ class MockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> AsyncIterator[str]:
         self.call_count += 1
         if self.should_fail:

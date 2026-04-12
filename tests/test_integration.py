@@ -91,6 +91,7 @@ class IntegrationMockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> ProviderResponse:
         self.call_count += 1
         self.calls.append({
@@ -99,19 +100,19 @@ class IntegrationMockProvider(BaseProvider):
             "temperature": temperature,
             "max_tokens": max_tokens,
         })
-        
+
         if self.should_fail:
             if self._current_fail_count < self.fail_count:
                 self._current_fail_count += 1
                 raise RuntimeError("Mock provider failure")
-        
+
         await asyncio.sleep(0)
-        
+
         # Determine if this is a coordinator call (contains agent outputs)
         is_coordinator = "Agent" in system_prompt and "synthesis" in user_message.lower()
-        
+
         text = self.coordinator_response if is_coordinator else self.response_text
-        
+
         return ProviderResponse(
             text=text,
             input_tokens=100,
@@ -119,13 +120,14 @@ class IntegrationMockProvider(BaseProvider):
             latency_ms=100.0,
             model_id=self._model_id,
         )
-    
+
     async def invoke_model_stream(
         self,
         system_prompt: str,
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> AsyncIterator[str]:
         self.call_count += 1
         self.calls.append({
@@ -135,10 +137,10 @@ class IntegrationMockProvider(BaseProvider):
             "max_tokens": max_tokens,
             "streaming": True,
         })
-        
+
         if self.should_fail:
             raise RuntimeError("Mock provider failure")
-        
+
         for char in self.coordinator_response:
             yield char
             await asyncio.sleep(0)

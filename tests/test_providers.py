@@ -33,6 +33,7 @@ class MockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> ProviderResponse:
         return ProviderResponse(
             text="Mock response",
@@ -48,6 +49,7 @@ class MockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> AsyncIterator[str]:
         yield "Mock"
         yield " response"

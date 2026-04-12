@@ -14,6 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 from toxp.agents.coordinator import CoordinatorAgent
 from toxp.agents.reasoning import ReasoningAgent
+from toxp.models.conversation import Message
 from toxp.exceptions import InsufficientAgentsError
 from toxp.models.query import Query
 from toxp.models.response import AgentResponse, CoordinatorResponse
@@ -108,6 +109,7 @@ class Orchestrator:
         on_agents_done: Optional[Callable[[], None]] = None,
         on_agent_token: Optional[Callable[[int, str], None]] = None,
         cancel_token: Optional[asyncio.Event] = None,
+        conversation_history: Optional[List[Message]] = None,
     ) -> Result:
         """Process a query through the full TOXP pipeline.
 
@@ -126,6 +128,9 @@ class Orchestrator:
             on_agent_token: Optional callback for agent streaming tokens (agent_id, token)
             cancel_token: Optional asyncio.Event for cooperative cancellation. When set,
                 the orchestrator stops spawning new agents and cancels in-flight work.
+            conversation_history: Optional prior conversation turns for multi-turn context.
+                When provided, agents and coordinator receive conversation history for
+                contextual follow-up questions.
 
         Returns:
             Result containing all agent responses and coordinator synthesis
@@ -148,6 +153,7 @@ class Orchestrator:
             on_agent_complete=on_agent_complete,
             on_agent_token=on_agent_token,
             cancel_token=cancel_token,
+            conversation_history=conversation_history,
         )
 
         # Check cancellation after agents complete
@@ -174,7 +180,7 @@ class Orchestrator:
         # Step 3: Invoke coordinator for synthesis
         try:
             coordinator_response = await self._synthesize(
-                query, agent_responses, on_coordinator_token
+                query, agent_responses, on_coordinator_token, conversation_history
             )
         except Exception as e:
             # Fallback: return partial results if coordinator fails
@@ -210,6 +216,7 @@ class Orchestrator:
         on_agent_complete: Optional[Callable[[int, bool, Optional[str]], None]] = None,
         on_agent_token: Optional[Callable[[int, str], None]] = None,
         cancel_token: Optional[asyncio.Event] = None,
+        conversation_history: Optional[List[Message]] = None,
     ) -> List[AgentResponse]:
         """Spawn reasoning agents with rate-limited concurrency.
 
@@ -222,6 +229,7 @@ class Orchestrator:
             on_agent_complete: Optional callback when agent completes
             on_agent_token: Optional callback for streaming tokens (agent_id, token)
             cancel_token: Optional asyncio.Event for cooperative cancellation
+            conversation_history: Optional prior conversation turns for multi-turn context
 
         Returns:
             List of AgentResponse objects (both successful and failed)
@@ -278,7 +286,11 @@ class Orchestrator:
                             aid, token
                         )
 
-                    result = await agent.reason(query.text, on_token=token_callback)
+                    result = await agent.reason(
+                        query.text,
+                        on_token=token_callback,
+                        conversation_history=conversation_history,
+                    )
 
                 if on_agent_complete:
                     error_msg = result.error if not result.success else None
@@ -354,14 +366,16 @@ class Orchestrator:
         query: Query,
         agent_responses: List[AgentResponse],
         on_token: Optional[Callable[[str], None]] = None,
+        conversation_history: Optional[List[Message]] = None,
     ) -> CoordinatorResponse:
         """Invoke coordinator to synthesize agent outputs.
-        
+
         Args:
             query: The original query
             agent_responses: All agent responses
             on_token: Optional callback for streaming output
-            
+            conversation_history: Optional prior conversation turns for multi-turn context
+
         Returns:
             CoordinatorResponse with synthesis
         """
@@ -370,15 +384,17 @@ class Orchestrator:
             temperature=self.coordinator_temperature,
             max_tokens=self.max_tokens,
         )
-        
+
         if on_token:
             # Use streaming synthesis
             return await coordinator.synthesize_stream(
-                query, agent_responses, on_token
+                query, agent_responses, on_token, conversation_history
             )
         else:
             # Use non-streaming synthesis
-            return await coordinator.synthesize(query, agent_responses)
+            return await coordinator.synthesize(
+                query, agent_responses, conversation_history
+            )
 
     def _create_fallback_response(
         self,

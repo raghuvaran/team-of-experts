@@ -47,15 +47,16 @@ class MockProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> ProviderResponse:
         self.call_count += 1
-        
+
         if self.should_fail:
             raise RuntimeError("Mock provider failure")
-        
+
         # Simulate some async work
         await asyncio.sleep(0)
-        
+
         return ProviderResponse(
             text=f"{self.response_text}\n\nFinal Answer: Test answer {self.call_count}",
             input_tokens=100,
@@ -63,19 +64,20 @@ class MockProvider(BaseProvider):
             latency_ms=100.0,
             model_id=self._model_id,
         )
-    
+
     async def invoke_model_stream(
         self,
         system_prompt: str,
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> AsyncIterator[str]:
         self.call_count += 1
-        
+
         if self.should_fail:
             raise RuntimeError("Mock provider failure")
-        
+
         response = f"{self.response_text}\n\n**Final Synthesized Answer**: Test synthesis\n\n**Confidence Level**: High"
         for char in response:
             yield char
@@ -245,16 +247,17 @@ class PartialFailureProvider(BaseProvider):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> ProviderResponse:
         current_call = self.call_count
         self.call_count += 1
-        
+
         # Fail for specific agent IDs
         if current_call in self.fail_agent_ids:
             raise RuntimeError(f"Simulated failure for agent {current_call}")
-        
+
         await asyncio.sleep(0)
-        
+
         return ProviderResponse(
             text=f"Response from agent {current_call}\n\nFinal Answer: Answer {current_call}",
             input_tokens=100,
@@ -262,21 +265,22 @@ class PartialFailureProvider(BaseProvider):
             latency_ms=100.0,
             model_id=self._model_id,
         )
-    
+
     async def invoke_model_stream(
         self,
         system_prompt: str,
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages=None,
     ) -> AsyncIterator[str]:
         current_call = self.call_count
         self.call_count += 1
-        
+
         # Fail for specific agent IDs (same logic as invoke_model)
         if current_call in self.fail_agent_ids:
             raise RuntimeError(f"Simulated failure for agent {current_call}")
-        
+
         response = f"Response from agent {current_call}\n\nFinal Answer: Answer {current_call}"
         for char in response:
             yield char

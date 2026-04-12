@@ -32,6 +32,9 @@ from toxp.api import (
     get_default_config,
 )
 
+# Conversation types
+from toxp.models.conversation import Message
+
 # Exceptions (already well-structured)
 from toxp.exceptions import (
     ToxpError,
@@ -54,6 +57,8 @@ __all__ = [
     "NoOpCallbacks",
     "validate_credentials",
     "get_default_config",
+    # Conversation types
+    "Message",
     # Exceptions
     "ToxpError",
     "CredentialsError",

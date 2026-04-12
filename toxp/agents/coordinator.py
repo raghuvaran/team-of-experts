@@ -5,6 +5,7 @@ import re
 import time
 from typing import Callable, List, Literal, Optional
 
+from toxp.models.conversation import Message
 from toxp.models.response import AgentResponse, CoordinatorResponse
 from toxp.models.query import Query
 from toxp.providers.base import BaseProvider
@@ -45,34 +46,38 @@ class CoordinatorAgent:
         self,
         query: Query,
         agent_responses: List[AgentResponse],
+        conversation_history: Optional[List[Message]] = None,
     ) -> CoordinatorResponse:
         """
         Synthesize multiple agent responses into a single coordinated answer.
-        
+
         This method:
         1. Builds coordinator prompt with all successful agent outputs
         2. Invokes the provider
         3. Parses the synthesis to extract structured components
         4. Returns a CoordinatorResponse with all synthesis details
-        
+
         Args:
             query: The original user query
             agent_responses: List of responses from reasoning agents
-            
+            conversation_history: Optional prior conversation turns for multi-turn context
+
         Returns:
             CoordinatorResponse containing synthesis, confidence, and final answer
-            
+
         Raises:
             ValueError: If no successful agent responses to synthesize
         """
         # Filter to only successful agent responses
         successful_responses = [r for r in agent_responses if r.success]
-        
+
         if not successful_responses:
             raise ValueError("No successful agent responses to synthesize")
-        
+
         # Build coordinator prompt with all agent outputs
-        coordinator_prompt = format_coordinator_prompt(query.text, successful_responses)
+        coordinator_prompt = format_coordinator_prompt(
+            query.text, successful_responses, conversation_history
+        )
         
         logger.debug(
             f"Coordinator prompt length: {len(coordinator_prompt):,} chars "
@@ -99,27 +104,31 @@ class CoordinatorAgent:
         query: Query,
         agent_responses: List[AgentResponse],
         on_token: Optional[Callable[[str], None]] = None,
+        conversation_history: Optional[List[Message]] = None,
     ) -> CoordinatorResponse:
         """
         Synthesize with streaming output - tokens are passed to on_token callback as they arrive.
-        
+
         Args:
             query: The original user query
             agent_responses: List of responses from reasoning agents
             on_token: Callback function called with each text chunk
-            
+            conversation_history: Optional prior conversation turns for multi-turn context
+
         Returns:
             CoordinatorResponse containing synthesis, confidence, and final answer
-            
+
         Raises:
             ValueError: If no successful agent responses to synthesize
         """
         successful_responses = [r for r in agent_responses if r.success]
-        
+
         if not successful_responses:
             raise ValueError("No successful agent responses to synthesize")
-        
-        coordinator_prompt = format_coordinator_prompt(query.text, successful_responses)
+
+        coordinator_prompt = format_coordinator_prompt(
+            query.text, successful_responses, conversation_history
+        )
         
         logger.debug(
             f"Coordinator prompt length: {len(coordinator_prompt):,} chars "

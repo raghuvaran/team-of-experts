@@ -8,8 +8,9 @@ The coordinator prompt implements a study group debate synthesis approach where
 multiple independent expert outputs are critiqued, compared, and synthesized.
 """
 
-from typing import List
+from typing import List, Optional
 
+from toxp.models.conversation import Message
 from toxp.models.response import AgentResponse
 
 
@@ -70,26 +71,91 @@ Produce your synthesis:
 """
 
 
-def format_coordinator_prompt(query: str, agent_responses: List[AgentResponse]) -> str:
+COORDINATOR_SYSTEM_PROMPT_MULTITURN = """
+You are an impartial, ultra-rigorous referee overseeing a study group of {num_agents} independent expert reasoning AIs.
+
+This is a follow-up question in an ongoing conversation. Use the conversation history for context to ensure your answer is coherent with what was discussed before.
+
+Conversation so far:
+{conversation_context}
+
+Current question: {query}
+
+Each agent below worked on the current question independently, with access to the conversation history, and produced a full chain-of-thought + proposed final answer.
+
+Your job:
+1. Read every agent's full reasoning carefully
+2. Use the conversation history for continuity — ensure your answer builds on prior discussion
+3. Identify agreements and contradictions among agents
+4. Critique logical errors, hallucinations, or weak steps in any agent
+5. Rank the solutions by correctness and rigor
+6. Synthesize the single best possible answer, merging strengths and discarding flaws
+7. If the majority is wrong but a minority is right, side with the minority and explain why
+8. Be maximally truth-seeking — prioritize correctness over consensus
+
+Output format:
+- **Consensus Summary**: What do most agents agree on?
+- **Key Debates**: Where do agents disagree and why?
+- **Critique**: Identify any logical errors or weak reasoning
+- **Final Synthesized Answer**: The best answer with full justification
+- **Confidence Level**: Low/Medium/High (with reasoning)
+
+Agent Outputs:
+{agent_outputs}
+
+Produce your synthesis:
+"""
+
+
+def _format_conversation_context(conversation_history: List[Message]) -> str:
+    """Format conversation history for the coordinator prompt.
+
+    Args:
+        conversation_history: List of prior conversation messages
+
+    Returns:
+        Formatted string with labeled turns
+    """
+    lines = []
+    for msg in conversation_history:
+        label = "User" if msg["role"] == "user" else "TOXP"
+        lines.append(f"[{label}]: {msg['content']}")
+    return "\n\n".join(lines)
+
+
+def format_coordinator_prompt(
+    query: str,
+    agent_responses: List[AgentResponse],
+    conversation_history: Optional[List[Message]] = None,
+) -> str:
     """
     Format coordinator prompt with numbered agent outputs.
-    
+
     Args:
         query: The original user query
         agent_responses: List of agent responses (only successful ones will be included)
-        
+        conversation_history: Optional prior conversation turns for multi-turn context
+
     Returns:
         Formatted system prompt for coordinator agent with all agent outputs
     """
     # Filter to only successful responses
     successful_responses = [r for r in agent_responses if r.success]
-    
+
     # Format each agent's output with clear separation
     agent_outputs = "\n\n".join([
         f"=== Agent {r.agent_id} ===\n{r.chain_of_thought}\n\nFinal Answer: {r.final_answer}"
         for r in successful_responses
     ])
-    
+
+    if conversation_history:
+        return COORDINATOR_SYSTEM_PROMPT_MULTITURN.format(
+            num_agents=len(successful_responses),
+            conversation_context=_format_conversation_context(conversation_history),
+            query=query,
+            agent_outputs=agent_outputs,
+        )
+
     return COORDINATOR_SYSTEM_PROMPT.format(
         num_agents=len(successful_responses),
         query=query,

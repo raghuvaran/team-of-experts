@@ -5,7 +5,9 @@ both synchronous and streaming model invocation methods.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, AsyncIterator, Dict
+from typing import Any, AsyncIterator, Dict, List, Optional
+
+from toxp.models.conversation import Message
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -107,18 +109,22 @@ class BaseProvider(ABC):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages: Optional[List[Message]] = None,
     ) -> ProviderResponse:
         """Invoke the model and return a complete response.
-        
+
         Args:
             system_prompt: The system prompt to set model behavior
-            user_message: The user's input message
+            user_message: The user's input message (used when messages is None)
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
-            
+            messages: Optional multi-turn conversation messages. When provided,
+                these are sent as native multi-turn messages instead of a single
+                user_message. Each message has role ("user"/"assistant") and content.
+
         Returns:
             ProviderResponse containing the model output and metrics
-            
+
         Raises:
             ProviderError: If the model invocation fails
         """
@@ -131,18 +137,22 @@ class BaseProvider(ABC):
         user_message: str,
         temperature: float,
         max_tokens: int,
+        messages: Optional[List[Message]] = None,
     ) -> AsyncIterator[str]:
         """Invoke the model with streaming response.
-        
+
         Args:
             system_prompt: The system prompt to set model behavior
-            user_message: The user's input message
+            user_message: The user's input message (used when messages is None)
             temperature: Sampling temperature (0.0 to 1.0)
             max_tokens: Maximum tokens to generate
-            
+            messages: Optional multi-turn conversation messages. When provided,
+                these are sent as native multi-turn messages instead of a single
+                user_message. Each message has role ("user"/"assistant") and content.
+
         Yields:
             String tokens as they are generated
-            
+
         Raises:
             ProviderError: If the model invocation fails
         """

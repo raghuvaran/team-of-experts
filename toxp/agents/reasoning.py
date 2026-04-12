@@ -3,8 +3,9 @@
 import logging
 import re
 import time
-from typing import Callable, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
+from toxp.models.conversation import Message
 from toxp.models.response import AgentResponse
 from toxp.providers.base import BaseProvider
 from toxp.agents.prompts import REASONING_AGENT_SYSTEM_PROMPT
@@ -46,20 +47,24 @@ class ReasoningAgent:
         self,
         query: str,
         on_token: Optional[Callable[[str], None]] = None,
+        conversation_history: Optional[List[Message]] = None,
     ) -> AgentResponse:
         """
         Execute reasoning on the given query using streaming.
-        
+
         This method:
         1. Invokes the provider with streaming to avoid timeout issues
         2. Optionally calls on_token callback for each streamed token
         3. Parses the response to extract chain-of-thought and final answer
         4. Handles errors gracefully without blocking other agents
-        
+
         Args:
             query: The user's question or problem to solve
             on_token: Optional callback invoked with each streamed token
-            
+            conversation_history: Optional prior conversation turns for multi-turn
+                context. When provided, the agent sees the full conversation as
+                native multi-turn messages via the Bedrock Converse API.
+
         Returns:
             AgentResponse with reasoning results or error information
         """
@@ -67,7 +72,14 @@ class ReasoningAgent:
         
         try:
             logger.info(f"Agent {self.agent_id}: Starting reasoning (streaming)")
-            
+
+            # Build multi-turn messages when conversation history is available
+            multi_turn_messages: Optional[List[Message]] = None
+            if conversation_history:
+                multi_turn_messages = list(conversation_history) + [
+                    {"role": "user", "content": query}
+                ]
+
             # Use streaming to avoid timeout issues with large prompts
             response_text = ""
             async for token in self.provider.invoke_model_stream(
@@ -75,6 +87,7 @@ class ReasoningAgent:
                 user_message=query,
                 temperature=self.temperature,
                 max_tokens=self.max_tokens,
+                messages=multi_turn_messages,
             ):
                 response_text += token
                 if on_token:

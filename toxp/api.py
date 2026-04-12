@@ -16,11 +16,12 @@ Usage:
 """
 
 import asyncio
-from typing import Optional, Protocol, runtime_checkable
+from typing import List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
 from toxp.config import ConfigManager, ToxpConfig
+from toxp.models.conversation import Message
 from toxp.exceptions import ToxpError
 from toxp.models.query import Query
 from toxp.models.response import AgentResponse, CoordinatorResponse
@@ -156,6 +157,7 @@ async def run_query(
     config_overrides: Optional[dict] = None,
     callbacks: Optional[QueryCallbacks] = None,
     cancel_token: Optional[asyncio.Event] = None,
+    conversation_history: Optional[List[Message]] = None,
 ) -> QueryResult:
     """Execute a toxp query through the full pipeline.
 
@@ -169,6 +171,12 @@ async def run_query(
             execution progress (agent lifecycle, streaming tokens).
         cancel_token: Optional asyncio.Event. When set, the orchestrator
             will stop spawning new agents and cancel in-flight work.
+        conversation_history: Optional list of prior conversation messages for
+            multi-turn support. Each message is a dict with "role" ("user" or
+            "assistant") and "content" (str). When provided, reasoning agents
+            and the coordinator receive conversation context for follow-up
+            questions. The CLI does not use this — it is for UI consumers
+            (Open WebUI, desktop apps) that manage conversation state.
 
     Returns:
         QueryResult with the synthesized answer, confidence, and metadata.
@@ -217,6 +225,7 @@ async def run_query(
         on_agents_done=cb.on_agents_done,
         on_agent_token=cb.on_agent_token,
         cancel_token=cancel_token,
+        conversation_history=conversation_history,
     )
 
     return QueryResult.from_result(result)
