@@ -132,7 +132,9 @@ class BedrockProvider(BaseProvider):
         )
         
         try:
-            session = boto3.Session(profile_name=self.aws_profile)
+            session = boto3.Session(
+                profile_name=self.aws_profile if self.aws_profile else None
+            )
             self.client = session.client(
                 "bedrock-runtime",
                 region_name=self.region,

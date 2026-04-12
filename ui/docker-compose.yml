@@ -1,0 +1,20 @@
+services:
+  open-webui:
+    build:
+      context: ..
+      dockerfile: ui/Dockerfile
+    ports:
+      - "${TOXP_PORT:-3000}:8080"
+    volumes:
+      - open-webui-data:/app/backend/data
+    environment:
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY:-toxp-local-dev-key}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8080/api/version"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+volumes:
+  open-webui-data:
