@@ -9,7 +9,7 @@ Library usage:
 
 import sys
 
-__version__ = "0.7.1"
+__version__ = "0.8.0"
 
 # Runtime Python version check
 MIN_PYTHON = (3, 10)
@@ -25,6 +25,7 @@ if sys.version_info < MIN_PYTHON:
 # Public API
 from toxp.api import (
     run_query,
+    render_html,
     QueryResult,
     QueryCallbacks,
     NoOpCallbacks,
@@ -52,6 +53,7 @@ __all__ = [
     "__version__",
     # API
     "run_query",
+    "render_html",
     "QueryResult",
     "QueryCallbacks",
     "NoOpCallbacks",

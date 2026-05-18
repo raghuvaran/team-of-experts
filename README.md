@@ -57,6 +57,8 @@ toxp -v "Analyze quicksort"        # verbose
 toxp --quiet "What is 2 + 2?"      # only answer
 toxp --output answer.txt "Question"
 toxp --context-1m "Summarize this very long document..."
+toxp --html "Compare PostgreSQL vs MongoDB for time-series data"
+toxp --html --html-style "minimal academic paper" "Explain CRDTs"
 ```
 
 ## Python API
@@ -98,7 +100,7 @@ toxp config reset                   # reset defaults
 | `num-agents` | `15` | Parallel agents (2-32) |
 | `temperature` | `0.9` | Agent temperature |
 | `coordinator-temperature` | `0.7` | Coordinator temperature |
-| `model` | `claude-sonnet-4-5` | Model ID (supports Opus 4.6) |
+| `model` | `claude-opus-4-7` | Model ID (supports Sonnet 4.5, Opus 4.6, Opus 4.7) |
 | `max-tokens` | `8192` | Max tokens per response |
 | `max-concurrency` | `auto` | Max concurrent API requests |
 | `context-1m` | `false` | Enable 1M token context window beta |
@@ -120,11 +122,32 @@ Options:
   --aws-profile TEXT
   --region TEXT
   --context-1m             Enable 1M token context window beta
+  --html                   Generate a rich self-contained HTML artifact and open it
+  --html-style TEXT        Style hint for the HTML artifact (e.g. "dashboard")
   -o, --output FILE
   -v, --verbose
   --quiet
   --help
 ```
+
+### HTML artifacts
+
+`--html` swaps the terminal markdown output for a rich, self-contained HTML
+file that opens in your browser. The HTML is authored by a single additional
+LLM call (so it costs ~one extra request and a few extra seconds) and is
+asked to use SVG diagrams, tables, color-coded sections, and a prominent
+"Final Answer" hero block.
+
+- **Where it lands**: `~/.toxp/html/<timestamp>-<query-slug>.html` by
+  default. Pass `-o path/to/file.html` to override.
+- **Self-contained**: all CSS and JS are inlined, no external requests —
+  shareable by just sending the file.
+- **Retention**: old HTML files are aged out using the same
+  `log-retention-days` config as session logs.
+- **`--html-style TEXT`**: optional free-form hint (e.g. `"dashboard"`,
+  `"academic paper"`, `"playful"`) appended to the HTML-author prompt.
+- **Fallback**: if the HTML pass fails for any reason, toxp falls back to
+  printing the markdown answer so you never lose your result.
 
 ## How It Works
 

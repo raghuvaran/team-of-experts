@@ -69,7 +69,7 @@ class ToxpConfig(BaseModel):
         description="AWS region for Bedrock",
     )
     model: str = Field(
-        default="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        default="us.anthropic.claude-opus-4-7",
         description="Model ID to use",
     )
     num_agents: int = Field(

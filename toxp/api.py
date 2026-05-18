@@ -16,7 +16,7 @@ Usage:
 """
 
 import asyncio
-from typing import List, Optional, Protocol, runtime_checkable
+from typing import Callable, List, Optional, Protocol, runtime_checkable
 
 from pydantic import BaseModel, Field
 
@@ -287,3 +287,69 @@ def get_default_config() -> dict:
     Useful for GUI settings panels to show current values.
     """
     return ConfigManager().load().to_dict()
+
+
+# ---------------------------------------------------------------------------
+# HTML rendering — second LLM pass that authors a self-contained HTML artifact
+# ---------------------------------------------------------------------------
+
+# Floor for the HTML pass: rich self-contained HTML with embedded SVG can
+# easily exceed the default coordinator max_tokens (8192). We bump the floor
+# rather than override the user's setting, in case they configured it higher.
+HTML_MIN_MAX_TOKENS = 16384
+
+
+async def render_html(
+    result: QueryResult,
+    *,
+    config_overrides: Optional[dict] = None,
+    style_hint: Optional[str] = None,
+    on_token: Optional[Callable[[str], None]] = None,
+) -> str:
+    """Generate a self-contained HTML artifact for an existing QueryResult.
+
+    Builds a fresh provider with the same effective config used by run_query
+    (plus optional overrides), runs ONE streaming LLM call, and returns the
+    HTML string. Does not touch the filesystem or the browser — callers handle
+    write/open.
+
+    Args:
+        result: A QueryResult returned by run_query. Must have raw_result
+            populated for best output (CLI path always populates it).
+        config_overrides: Same shape as run_query's config_overrides. If you
+            ran the query with overrides, pass the same ones here so the HTML
+            pass uses the same model/region/profile.
+        style_hint: Optional free-form hint appended to the HTML-author
+            system prompt (e.g. "minimal academic paper", "dashboard").
+        on_token: Optional callback invoked for each streamed token. Useful
+            for progress UIs.
+
+    Returns:
+        A self-contained HTML5 document as a string.
+
+    Raises:
+        toxp.output.html_renderer.HtmlGenerationError: If the model returned
+            non-HTML output.
+        toxp.exceptions.ToxpError: For provider/credential failures.
+    """
+    from toxp.output.html_renderer import generate_html_artifact
+
+    config_manager = ConfigManager()
+    config = config_manager.load_with_overrides(config_overrides)
+
+    provider_class = ProviderRegistry.get(config.provider)
+    provider = provider_class(
+        region=config.region,
+        aws_profile=config.aws_profile,
+        model_id=config.model,
+        context_1m=config.context_1m,
+    )
+
+    return await generate_html_artifact(
+        result,
+        provider=provider,
+        style_hint=style_hint,
+        on_token=on_token,
+        temperature=config.coordinator_temperature,
+        max_tokens=max(config.max_tokens, HTML_MIN_MAX_TOKENS),
+    )

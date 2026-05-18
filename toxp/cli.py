@@ -31,9 +31,16 @@ from toxp.output.progress import create_progress_display
 class CLICallbacks:
     """QueryCallbacks implementation that drives Rich progress + streaming."""
 
-    def __init__(self, formatter: OutputFormatter, progress):
+    def __init__(
+        self,
+        formatter: OutputFormatter,
+        progress,
+        *,
+        suppress_coordinator_stream: bool = False,
+    ):
         self._formatter = formatter
         self._progress = progress
+        self._suppress_coord = suppress_coordinator_stream
         self._agent_start_cb = None
         self._agent_complete_cb = None
         self._agent_token_cb = None
@@ -63,6 +70,8 @@ class CLICallbacks:
             self._progress.stop()
 
     def on_coordinator_token(self, token: str) -> None:
+        if self._suppress_coord:
+            return
         self._formatter.stream_token(token)
 
 
@@ -83,7 +92,7 @@ def _add_query_flags(parser: argparse.ArgumentParser) -> None:
                         help="Number of reasoning agents to spawn (2-32, default: 15)")
     parser.add_argument("-m", "--model", metavar="ID",
                         help="Model ID to use (e.g., "
-                        "us.anthropic.claude-sonnet-4-5-20250929-v1:0)")
+                        "us.anthropic.claude-opus-4-7)")
     parser.add_argument("--temperature", type=float, metavar="T",
                         help="Sampling temperature for agents (0.0-1.0, default: 0.9)")
     parser.add_argument("--aws-profile", metavar="PROFILE",
@@ -95,6 +104,13 @@ def _add_query_flags(parser: argparse.ArgumentParser) -> None:
                         "(default: auto-calculated based on model quotas)")
     parser.add_argument("--context-1m", action="store_true", default=None,
                         help="Enable 1M token context window beta")
+    parser.add_argument("--html", action="store_true",
+                        help="Generate a rich self-contained HTML artifact and "
+                        "open it in the browser instead of streaming markdown")
+    parser.add_argument("--html-style", dest="html_style", metavar="TEXT",
+                        help="Optional style hint for the HTML artifact "
+                        "(e.g. 'minimal academic paper', 'dashboard'). "
+                        "Only meaningful with --html.")
 
 
 def create_parser() -> argparse.ArgumentParser:
@@ -297,6 +313,12 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
 
     verbose = getattr(args, "verbose", False)
     log_enabled = not getattr(args, "no_log", False)
+    html_mode = getattr(args, "html", False)
+    html_style = getattr(args, "html_style", None)
+
+    if html_style and not html_mode:
+        formatter.warning("--html-style ignored without --html")
+        html_style = None
 
     # Build config overrides from CLI args
     cli_overrides = {
@@ -334,7 +356,11 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
         )
 
         # Wire CLI callbacks
-        callbacks = CLICallbacks(formatter, progress)
+        callbacks = CLICallbacks(
+            formatter,
+            progress,
+            suppress_coordinator_stream=html_mode,
+        )
 
         if progress:
             progress.start()
@@ -349,20 +375,31 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
             if progress:
                 progress.stop()
 
-        if not args.quiet:
-            formatter.stream_end()
+        if not html_mode:
+            if not args.quiet:
+                formatter.stream_end()
 
-        formatter.agent_summary(result.successful_agents, result.total_agents)
+            formatter.agent_summary(result.successful_agents, result.total_agents)
 
-        formatter.final_answer(
-            result.final_answer,
-            confidence_level=result.confidence,
-        )
+            formatter.final_answer(
+                result.final_answer,
+                confidence_level=result.confidence,
+            )
 
-        if args.output_file:
-            output_path = Path(args.output_file)
-            output_path.write_text(result.final_answer)
-            formatter.success(f"Answer written to {output_path}")
+            if args.output_file:
+                output_path = Path(args.output_file)
+                output_path.write_text(result.final_answer)
+                formatter.success(f"Answer written to {output_path}")
+        else:
+            await _render_and_open_html(
+                args=args,
+                result=result,
+                config=config,
+                cli_overrides=cli_overrides,
+                style_hint=html_style,
+                formatter=formatter,
+                verbose=verbose,
+            )
 
         if log_enabled and result.raw_result:
             session_logger = SessionLogger(
@@ -432,9 +469,99 @@ async def handle_query_command(args: argparse.Namespace, remaining: List[str],
         return 1
 
 
+async def _render_and_open_html(
+    *,
+    args: argparse.Namespace,
+    result,
+    config,
+    cli_overrides: dict,
+    style_hint: Optional[str],
+    formatter: OutputFormatter,
+    verbose: bool,
+) -> None:
+    """Run the HTML pass, write to disk, open in browser, with markdown fallback.
+
+    Never raises — failures fall back to printing the markdown final answer
+    so the user always gets their result.
+    """
+    from contextlib import nullcontext
+
+    from rich.console import Console
+
+    from toxp.api import render_html
+    from toxp.output.html_renderer import (
+        cleanup_old_html,
+        default_html_path,
+        open_in_browser,
+        write_html,
+        HTML_DIR,
+    )
+
+    if not args.quiet:
+        formatter.agent_summary(result.successful_agents, result.total_agents)
+
+    try:
+        console = Console(stderr=True)
+        status_ctx = (
+            console.status("[cyan]Generating HTML artifact...[/]")
+            if not args.quiet else nullcontext()
+        )
+        with status_ctx:
+            html = await render_html(
+                result,
+                config_overrides=cli_overrides or None,
+                style_hint=style_hint,
+            )
+
+        if args.output_file:
+            dest = Path(args.output_file)
+            using_default_dir = False
+            ext = dest.suffix.lower()
+            if ext not in {".html", ".htm"}:
+                formatter.warning(
+                    f"--output extension is '{ext or '(none)'}' but content is HTML"
+                )
+        else:
+            dest = default_html_path(result)
+            using_default_dir = True
+
+        write_html(html, dest)
+
+        if using_default_dir:
+            cleanup_old_html(HTML_DIR, config.log_retention_days)
+
+        opened = open_in_browser(dest)
+
+        if args.quiet:
+            print(str(dest))
+        else:
+            formatter.success(f"HTML artifact written to {dest}")
+            if opened:
+                formatter.info(f"Opened: file://{dest.resolve()}")
+            else:
+                formatter.info(
+                    f"(could not auto-open) Open manually: file://{dest.resolve()}"
+                )
+    except Exception as html_err:  # noqa: BLE001 — fallback path is intentional
+        formatter.warning(
+            f"HTML generation failed: {html_err}. Falling back to text answer."
+        )
+        if verbose:
+            import traceback
+            traceback.print_exc()
+        formatter.final_answer(
+            result.final_answer,
+            confidence_level=result.confidence,
+        )
+        if args.output_file:
+            output_path = Path(args.output_file)
+            output_path.write_text(result.final_answer)
+            formatter.success(f"Answer written to {output_path}")
+
+
 def main() -> int:
     """Main entry point for the TOXP CLI.
-    
+
     Requirements: 10.4, 10.5, 10.8 - Error handling and help documentation.
     """
     try:

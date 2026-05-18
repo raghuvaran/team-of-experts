@@ -81,7 +81,7 @@ class BedrockProvider(BaseProvider):
     def __init__(
         self,
         region: str = "us-east-1",
-        model_id: str = "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        model_id: str = "us.anthropic.claude-opus-4-7",
         aws_profile: str = "default",
         timeout_seconds: int = 120,
         max_retries: int = 3,

@@ -18,6 +18,7 @@ MODEL_PRICING = {
     "default": 0.000009,  # $9/1M tokens
     "claude-sonnet": 0.000009,
     "claude-haiku": 0.000001,  # $1/1M tokens
+    "claude-opus-4-7": 0.000015,  # ~$15/1M blended
     "claude-opus-4-6": 0.000015,  # $5 in + $25 out, ~$15/1M blended
     "claude-opus": 0.000045,  # $45/1M tokens
 }
@@ -190,6 +191,8 @@ class SessionLogger:
         model_lower = model_id.lower()
         if "haiku" in model_lower:
             price_per_token = MODEL_PRICING["claude-haiku"]
+        elif "opus-4-7" in model_lower:
+            price_per_token = MODEL_PRICING["claude-opus-4-7"]
         elif "opus-4-6" in model_lower:
             price_per_token = MODEL_PRICING["claude-opus-4-6"]
         elif "opus" in model_lower:
