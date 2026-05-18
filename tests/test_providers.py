@@ -616,3 +616,34 @@ class TestContext1mBetaHeader:
     def test_opus_46_model_ids_pass_validation(self, model_id: str) -> None:
         """All Opus 4.6 model ID variants pass validation."""
         assert BedrockProvider.is_valid_model_id(model_id) is True
+
+
+class TestInferenceConfigBuilder:
+    """Tests for _build_inference_config — temperature handling per model."""
+
+    @pytest.mark.parametrize("model_id", [
+        "us.anthropic.claude-opus-4-7",
+        "global.anthropic.claude-opus-4-7",
+        "anthropic.claude-opus-4-7",
+        "us.anthropic.claude-opus-4-7-v1",
+    ])
+    def test_opus_47_omits_temperature(self, model_id: str) -> None:
+        """Opus 4.7 deprecated temperature; inferenceConfig must not include it."""
+        provider = BedrockProvider.__new__(BedrockProvider)
+        provider._model_id = model_id
+        cfg = provider._build_inference_config(temperature=0.7, max_tokens=8192)
+        assert "temperature" not in cfg
+        assert cfg == {"maxTokens": 8192}
+
+    @pytest.mark.parametrize("model_id", [
+        "us.anthropic.claude-sonnet-4-5-20250929-v1:0",
+        "global.anthropic.claude-opus-4-6-v1",
+        "anthropic.claude-3-5-sonnet-20241022-v2:0",
+        "anthropic.claude-3-haiku-20240307-v1:0",
+    ])
+    def test_other_models_keep_temperature(self, model_id: str) -> None:
+        """Non-deprecated models still receive temperature."""
+        provider = BedrockProvider.__new__(BedrockProvider)
+        provider._model_id = model_id
+        cfg = provider._build_inference_config(temperature=0.7, max_tokens=8192)
+        assert cfg == {"temperature": 0.7, "maxTokens": 8192}

@@ -162,6 +162,22 @@ class BedrockProvider(BaseProvider):
             return {"anthropic_beta": ["context-1m-2025-08-07"]}
         return {}
 
+    # Models that have deprecated `temperature` in the Converse inferenceConfig
+    # and reject requests that include it (Bedrock returns ValidationException:
+    # "`temperature` is deprecated for this model").
+    _TEMPERATURE_DEPRECATED_PATTERNS = ("claude-opus-4-7",)
+
+    def _model_supports_temperature(self) -> bool:
+        m = self._model_id.lower()
+        return not any(p in m for p in self._TEMPERATURE_DEPRECATED_PATTERNS)
+
+    def _build_inference_config(self, temperature: float, max_tokens: int) -> dict:
+        """Build inferenceConfig, omitting temperature for models that deprecated it."""
+        cfg: dict = {"maxTokens": max_tokens}
+        if self._model_supports_temperature():
+            cfg["temperature"] = temperature
+        return cfg
+
     @classmethod
     def validate_model_id(cls, model_id: str) -> bool:
         """Validate model ID format.
@@ -253,13 +269,10 @@ class BedrockProvider(BaseProvider):
             TimeoutError: If invocation exceeds timeout
         """
         bedrock_messages = self._build_bedrock_messages(user_message, messages)
-        
+
         system_prompts = [{"text": system_prompt}]
-        
-        inference_config = {
-            "temperature": temperature,
-            "maxTokens": max_tokens,
-        }
+
+        inference_config = self._build_inference_config(temperature, max_tokens)
 
         retry_count = 0
         base_delay = 1.0  # Start with 1 second delay
@@ -391,12 +404,9 @@ class BedrockProvider(BaseProvider):
         bedrock_messages = self._build_bedrock_messages(user_message, messages)
 
         system_prompts = [{"text": system_prompt}]
-        
-        inference_config = {
-            "temperature": temperature,
-            "maxTokens": max_tokens,
-        }
-        
+
+        inference_config = self._build_inference_config(temperature, max_tokens)
+
         # Use thread-safe queue for cross-thread communication
         token_queue: queue_module.Queue[str | None] = queue_module.Queue()
         error_holder: list = []  # To propagate exceptions from thread
